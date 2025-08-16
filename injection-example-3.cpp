@@ -7,8 +7,7 @@
 #include <stdio.h>
 #include <tlhelp32.h>
 
-// Adapted from Pavel Yosifovich's
-// Enumerate Processes (part 1): https://www.youtube.com/watch?v=IZULG6I4z5U
+// Adapted from Pavel Yosifovich's Enumerate Processes (part 1): https://www.youtube.com/watch?v=IZULG6I4z5U
 DWORD FindpidByName(LPCWSTR processName) {
     DWORD foundpid = 0;
     HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
