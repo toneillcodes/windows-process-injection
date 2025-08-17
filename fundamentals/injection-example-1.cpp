@@ -1,5 +1,5 @@
 /*
-* Process injection example 1: injecting calc.exe msfvenom shellcode into the running process
+* Process injection example 1: injecting calc.exe msfvenom shellcode into the current process
 * shellcode: msfvenom -p windows/x64/exec CMD=calc.exe -f C EXITFUNC=thread
 * compile: cl.exe injection-example-1.cpp /W0
 */
