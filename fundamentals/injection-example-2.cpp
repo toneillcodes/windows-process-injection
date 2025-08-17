@@ -1,5 +1,5 @@
 /*
-* Process injection example 2: injecting calc.exe msfvenom shellcode into the running process, toggling the memory protection between RW and RWX
+* Process injection example 2: injecting calc.exe msfvenom shellcode into the current process, toggling the memory protection between RW and RWX
 * shellcode: msfvenom -p windows/x64/exec CMD=calc.exe -f C EXITFUNC=thread
 * compile: cl.exe injection-example-2.cpp  /W0
 */
