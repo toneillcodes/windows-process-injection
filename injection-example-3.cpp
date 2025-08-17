@@ -1,7 +1,7 @@
 /*
 * Process injection example 3: injecting calc.exe msfvenom shellcode into a remote process
 * shellcode: msfvenom -p windows/x64/exec CMD=calc.exe -f C EXITFUNC=thread
-* compile: cl.exe injection-example-3.cpp  /D"_UNICODE" /D"UNICODE"
+* compile: cl.exe injection-example-3.cpp  /D"_UNICODE" /D"UNICODE" /W0
 */
 #include <windows.h>
 #include <stdio.h>
