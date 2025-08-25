@@ -46,7 +46,7 @@ typedef HANDLE(WINAPI* P_CreateRemoteThread) (
 );
 
 // Adapted from Pavel Yosifovich's Enumerate Processes (part 1): https://www.youtube.com/watch?v=IZULG6I4z5U
-DWORD FindpidByName(LPCWSTR processName) {
+DWORD FindPidByName(LPCWSTR processName) {
     DWORD foundpid = 0;
     HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (hSnapshot == INVALID_HANDLE_VALUE) {
@@ -101,7 +101,7 @@ int main() {
     DWORD pid = 0;
     const wchar_t* processName = L"notepad.exe";
 
-    pid = FindpidByName(processName);
+    pid = FindPidByName(processName);
     if (pid == 0) {
         printf("[ERROR] Failed to obtain process ID!\n");
         return -1;
