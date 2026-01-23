@@ -8,3 +8,11 @@ A collection of examples intended to demonstrate the fundamentals and provide a 
 * [injection-example-2.cpp](https://github.com/toneillcodes/windows-process-injection/blob/main/fundamentals/injection-example-2.cpp): injecting calc.exe msfvenom shellcode into the current process, toggling the memory protection between RW and RWX
 * [injection-example-3.cpp](https://github.com/toneillcodes/windows-process-injection/blob/main/fundamentals/injection-example-3.cpp): injecting calc.exe msfvenom shellcode into a remote process, with memory protection toggling
 * [injection-example-4.cpp](https://github.com/toneillcodes/windows-process-injection/blob/main/fundamentals/injection-example-4.cpp): injecting calc.exe msfvenom shellcode into a remote process, with memory protection toggling and using dynamic function resolution
+
+## Techniques
+* [Dynamic Function Resolution]()
+* [Module Stomping]
+* [Walking the PEB and EAT]
+* [Direct Syscalls]
+* [Indirect Syscalls]
+* [Thread Pool Injection]
