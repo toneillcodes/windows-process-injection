@@ -10,9 +10,9 @@ A collection of examples intended to demonstrate the fundamentals and provide a 
 * [injection-example-4.cpp](https://github.com/toneillcodes/windows-process-injection/blob/main/fundamentals/injection-example-4.cpp): injecting calc.exe msfvenom shellcode into a remote process, with memory protection toggling and using dynamic function resolution
 
 ## Techniques
-* [Dynamic Function Resolution]()
-* [Module Stomping]
-* [Walking the PEB and EAT]
-* [Direct Syscalls]
-* [Indirect Syscalls]
-* [Thread Pool Injection]
+* [Dynamic Function Resolution](dynamic-function-resolution\README.md)
+* [Module Stomping](module-stomping\README.md)
+* [Walking the PEB and EAT](walking-peb-eat\README.md)
+* [Direct Syscalls](direct-syscalls\README.md)
+* [Indirect Syscalls](indirect-syscalls\README.md)
+* [Thread Pool Injection](thread-pool-injection\README.md)

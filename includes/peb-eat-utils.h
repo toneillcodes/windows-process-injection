@@ -1,9 +1,11 @@
 #ifndef PEB_EAT_UTILS_H
 #define PEB_EAT_UTILS_H
 
-#include <windows.h>
-#include <winternl.h> 
-#include <intrin.h>    
+#include <stdio.h>      // For IO operations
+#include <windows.h>    // For data structures, types, functions
+
+#include <intrin.h>     // Required for __readgsqword / __readfsdword
+#include <winternl.h>   // for peb data structure https://learn.microsoft.com/en-us/windows/win32/api/winternl/ns-winternl-peb
 
 // Define missing NTSTATUS codes
 #ifndef STATUS_SUCCESS
