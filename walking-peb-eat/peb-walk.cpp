@@ -4,8 +4,8 @@
 #include <intrin.h>     // Required for __readgsqword / __readfsdword
 #include <winternl.h>   // for peb data structure https://learn.microsoft.com/en-us/windows/win32/api/winternl/ns-winternl-peb
 
-#include "../header-files/utils.h"              //  crt replacements
-#include "../header-files/peb-eat-utils.h"      //  custom peb/eat walking functions
+#include "../includes/utils.h"              //  crt replacements
+#include "../includes/peb-eat-utils.h"      //  custom peb/eat walking functions
 
 #define MAX_EXPORTED_FUNCS 25
 

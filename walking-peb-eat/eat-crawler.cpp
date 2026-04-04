@@ -7,8 +7,8 @@
 // for testing with MessageBoxA
 #pragma comment(lib, "user32.lib")
 
-#include "utils.h"
-#include "peb-eat-utils.h"
+#include "..\includes\utils.h"
+#include "..\includes\peb-eat-utils.h"
 
 #define MAX_EXPORTED_FUNCS 25
 
