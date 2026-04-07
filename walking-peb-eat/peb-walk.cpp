@@ -55,7 +55,7 @@ int main(int argc, char* argv[]) {
     PVOID dllBase = GetModuleBaseManual(peb_ptr, "USER32.dll");         // or maybe ntdll.dll
     if(dllBase) {
         printf("DLL found @ %llx\n",dllBase);
-        PVOID rvaFound = GetProcAddressManualByName((HMODULE) dllBase, "MessageBoxA");    // and then NtAllocateVirtualMemory
+        PVOID rvaFound = GPAManualByName((HMODULE) dllBase, "MessageBoxA");    // and then NtAllocateVirtualMemory
         if(rvaFound) {
             printf("found function within DLL @ %llx\n", rvaFound);			
             // MessageBoxA example

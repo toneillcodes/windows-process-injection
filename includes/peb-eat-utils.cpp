@@ -48,8 +48,8 @@ PVOID GetRemotePebAddress(HANDLE hProcess) {
 }
 
 // find the address of an exported function within a given module
-// obviously depends on a name value being present in the array found at AddressOfNames
-PVOID GetProcAddressManualByName(HMODULE hMod, char* targetFunc) {
+// depends on a name value being present in the array found at AddressOfNames
+PVOID GPAManualByName(HMODULE hMod, char* targetFunc) {
     PBYTE base = (PBYTE)hMod;
 
     PIMAGE_DOS_HEADER dos = (PIMAGE_DOS_HEADER)base;
@@ -102,7 +102,7 @@ PVOID GetProcAddressManualByName(HMODULE hMod, char* targetFunc) {
 }
 
 // find the address of an exported function within a given module
-PVOID GetProcAddressManualByOrdinal(HMODULE hMod, WORD ordinal) {
+PVOID GPAManualByOrdinal(HMODULE hMod, WORD ordinal) {
     PBYTE base = (PBYTE)hMod;
 
     // 1. Navigate to the Export Directory (standard PE parsing)

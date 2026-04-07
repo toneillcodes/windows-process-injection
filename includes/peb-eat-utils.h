@@ -22,10 +22,10 @@ PVOID GetRemotePebAddress(HANDLE hProcess);
 int my_strlen(const char* inputString);
 
 // Manual implementation of GetProcAddress (by name)
-PVOID GetProcAddressManualByName(HMODULE hMod, char* targetFunc);
+PVOID GPAManualByName(HMODULE hMod, char* targetFunc);
 
 // Manual implementation of GetProcAddress (by ordinal)
-PVOID GetProcAddressManualByOrdinal(HMODULE hMod, WORD ordinal);
+PVOID GPAManualByOrdinal(HMODULE hMod, WORD ordinal);
 
 // Manually finds the base address of a module using the PEB's Ldr list
 PVOID GetModuleBaseManual(PPEB pebObject, const char* targetModuleName);

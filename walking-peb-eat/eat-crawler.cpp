@@ -86,7 +86,7 @@ int main(int argc, char* argv[]) {
         }
         //ParseDll(moduleBaseAddress);
         PVOID moduleBase = moduleBaseAddress;
-        // 1. Get DOS Header
+        // Get DOS Header
         PIMAGE_DOS_HEADER dosHeader = (PIMAGE_DOS_HEADER)moduleBase;
         if (dosHeader->e_magic != IMAGE_DOS_SIGNATURE) {
             printf("Invalid DOS Signature\n");
@@ -159,7 +159,7 @@ int main(int argc, char* argv[]) {
                 // Iterate through every function exported by the DLL
                 for (DWORD i = 0; i < NumberOfFunctions; i++) {
 
-                    // 1. Get the Function RVA directly using the index 'i'                    
+                    // Get the Function RVA directly using the index 'i'                    
                     DWORD functionRVA = functionsArray[i];
                     if (functionRVA == 0) continue; // Skip entries with no address
 
