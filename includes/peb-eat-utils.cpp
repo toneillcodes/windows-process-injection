@@ -105,21 +105,19 @@ PVOID GPAManualByName(HMODULE hMod, char* targetFunc) {
 PVOID GPAManualByOrdinal(HMODULE hMod, WORD ordinal) {
     PBYTE base = (PBYTE)hMod;
 
-    // 1. Navigate to the Export Directory (standard PE parsing)
+    // Navigate to the Export Directory (standard PE parsing)
     PIMAGE_DOS_HEADER dos = (PIMAGE_DOS_HEADER)base;
     PIMAGE_NT_HEADERS nt = (PIMAGE_NT_HEADERS)(base + dos->e_lfanew);
     PIMAGE_EXPORT_DIRECTORY exports = (PIMAGE_EXPORT_DIRECTORY)(base +
         nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress);
 
-    // 2. Adjust the ordinal
-    // Most DLLs start their ordinals at a "Base" (usually 1). 
-    // If the DLL says export #12 and the Base is 1, the actual index is 11.
+    // Adjust the ordinal
     DWORD functionIndex = ordinal - exports->Base;
 
-    // 3. Bounds check
+    // Bounds check
     if (functionIndex >= exports->NumberOfFunctions) return NULL;
 
-    // 4. Get the RVA from the functions array
+    // Get the RVA from the functions array
     PDWORD functionsArray = (PDWORD)(base + exports->AddressOfFunctions);
     DWORD funcRVA = functionsArray[functionIndex];
 

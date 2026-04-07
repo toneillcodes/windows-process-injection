@@ -1,3 +1,6 @@
+//
+// cl.exe /W0 /EHsc /I "..\includes" eat-crawler.cpp ..\includes\peb-eat-utils.cpp ..\includes\utils.cpp /Fe:eat-crawler.exe
+//
 #include <windows.h>
 #include <stdio.h>
 #include <string.h>
@@ -15,7 +18,7 @@
 typedef int (WINAPI* myMessageBoxA)(HWND hWnd, LPCSTR lptext, LPCSTR lpCaption, UINT uType);
 
 int main(int argc, char* argv[]) {
-    int debugOutput = 1;
+    int debugOutput = 0;
     uintptr_t functionAddresses[MAX_EXPORTED_FUNCS];
 
     void* teb = GetLocalTebAddress();
@@ -157,23 +160,9 @@ int main(int argc, char* argv[]) {
             }            
             else {
                 // Iterate through every function exported by the DLL
-                for (DWORD i = 0; i < NumberOfFunctions; i++) {
-
-                    // Get the Function RVA directly using the index 'i'                    
-                    DWORD functionRVA = functionsArray[i];
-                    if (functionRVA == 0) continue; // Skip entries with no address
-
-                    char* funcName = NULL;
-
-                    // Search the NameOrdinals array for a value that matches 'i'
-                    for (DWORD j = 0; j < NumberOfNames; j++) {
-                        if (ordinalsArray[j] == i) {
-                            // the name at nameArray[j] belongs to function index i
-                            funcName = (char*)((BYTE*)moduleBase + nameArray[j]);
-                            break;
-                        }
-                    }
-
+                for (DWORD j = 0; j < exportDir->NumberOfNames; j++) {
+                    char* funcName = (char*)((BYTE*)moduleBase + nameArray[j]);
+                
                     // check if it matches our target function
                     if (funcName != NULL) {
                         if (debugOutput) {  
@@ -186,6 +175,10 @@ int main(int argc, char* argv[]) {
                             DWORD exportStart = exportDataDir.VirtualAddress;
                             DWORD exportEnd = exportDataDir.VirtualAddress + exportDataDir.Size;
 
+                            WORD biasedIndex = ordinalsArray[j]; // Index into AddressOfFunctions
+                            DWORD actualOrdinal = biasedIndex + exportDir->Base;
+                            DWORD functionRVA = functionsArray[biasedIndex];
+
                             if (functionRVA >= exportStart && functionRVA < exportEnd) {
                                 char* forwarderString = (char*)((BYTE*)moduleBase + functionRVA);
                                 printf("[!] Found %s, but it's a forwarder to: %s\n", targetFunc, forwarderString);
@@ -197,8 +190,8 @@ int main(int argc, char* argv[]) {
                             if (foundCount < MAX_EXPORTED_FUNCS) {
                                 functionAddresses[foundCount] = finalFunctionAddr;
                                 foundCount++;
-                            }                            
-                            printf("[%s] found at: 0x%llx in: %wZ\n", targetFunc, finalFunctionAddr, &module_entry->FullDllName);
+                            }                                             
+                            printf("[%s] found at: 0x%llx with ordinal: %u, in: %wZ\n", targetFunc, finalFunctionAddr, actualOrdinal, &module_entry->FullDllName);                            
                         }
                     }
                 }

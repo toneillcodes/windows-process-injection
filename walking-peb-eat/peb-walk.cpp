@@ -1,3 +1,6 @@
+//
+// cl.exe /W0 /EHsc /I "..\includes" peb-walk.cpp ..\includes\peb-eat-utils.cpp ..\includes\utils.cpp /Fe:peb-walk.exe
+//
 #include <windows.h>
 #include <stdio.h>
 #include <string.h>
@@ -56,6 +59,7 @@ int main(int argc, char* argv[]) {
     if(dllBase) {
         printf("DLL found @ %llx\n",dllBase);
         PVOID rvaFound = GPAManualByName((HMODULE) dllBase, "MessageBoxA");    // and then NtAllocateVirtualMemory
+        //PVOID rvaFound = GPAManualByOrdinal((HMODULE) dllBase, 2151);            // and then NtAllocateVirtualMemory        
         if(rvaFound) {
             printf("found function within DLL @ %llx\n", rvaFound);			
             // MessageBoxA example
