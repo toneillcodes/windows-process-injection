@@ -76,3 +76,19 @@ int my_wcsicmp(const wchar_t* s1, const wchar_t* s2) {
     
     return c1 - c2;
 }
+
+// Helper to find Explorer PID
+DWORD GetExplorerPID() {
+    HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    PROCESSENTRY32 pe = { sizeof(pe) };
+    if (Process32First(hSnapshot, &pe)) {
+        do {
+            if (lstrcmpiW(pe.szExeFile, L"explorer.exe") == 0) {
+                CloseHandle(hSnapshot);
+                return pe.th32ProcessID;
+            }
+        } while (Process32Next(hSnapshot, &pe));
+    }
+    if (hSnapshot) CloseHandle(hSnapshot);
+    return 0;
+}
