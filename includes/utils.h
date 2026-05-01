@@ -2,6 +2,7 @@
 #define UTILS_H
 
 #include <windows.h> // Needed for wchar_t and NULL
+#include <tlhelp32.h>
 
 // Function Declarations
 int my_atoi(const char* s);
