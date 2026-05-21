@@ -6,11 +6,37 @@ def auto_int(x):
     """Helper to accept both decimal integers and hex strings (0x...) from CLI."""
     return int(x, 0)
 
-def find_phantom_dll_candidates(target_dir, min_file_size_mb, min_text_section_size):
+def parse_flat_file(file_path, list_type_label):
     """
-    Scans a directory for DLLs larger than a minimum file size, then parses their 
-    PE headers to find candidates where the .text section is large enough to hold 
-    the mapped payload.
+    Parses a flat text file containing only clean DLL filenames (one per line).
+    Normalizes them to lowercase for robust, case-insensitive comparison.
+    """
+    names_set = set()
+    if not file_path:
+        return names_set
+
+    print(f"[*] Loading {list_type_label} from: '{file_path}'")
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                dll_name = line.strip().lower()
+                
+                # Ignore blank lines or markdown-style separator lines
+                if not dll_name or dll_name.startswith('---') or dll_name.startswith('[+]'):
+                    continue
+                
+                names_set.add(dll_name)
+                    
+        print(f"[+] Loaded {len(names_set)} modules into {list_type_label} filter.")
+    except Exception as e:
+        print(f"[-] Warning: Failed to read {list_type_label} file: {e}")
+        
+    return names_set
+
+def find_phantom_dll_candidates(target_dir, min_file_size_mb, min_text_section_size, excluded_dlls, included_dlls):
+    """
+    Scans a directory for DLLs matching structural criteria.
+    Supports exclusion filters (blacklists) and targeted scope filters (whitelists).
     """
     min_file_size_bytes = min_file_size_mb * 1024 * 1024
     candidates = []
@@ -18,13 +44,28 @@ def find_phantom_dll_candidates(target_dir, min_file_size_mb, min_text_section_s
     print(f"[*] Scanning Target Directory: '{target_dir}'")
     print(f"[*] Filtering for Files      : > {min_file_size_mb}MB")
     print(f"[*] Required .text Space     : {hex(min_text_section_size)} bytes")
-    print("-" * 90)
-    print(f"{'DLL Name':<40} | {'File Size (MB)':<15} | {'Size of .text':<15} | {'Virtual Address':<15}")
-    print("-" * 90)
+    
+    if included_dlls:
+        print(f"[*] Targeted Include Filter  : Active ({len(included_dlls)} specific targets allowed)")
+    if excluded_dlls:
+        print(f"[*] Exclusion Filter         : Active ({len(excluded_dlls)} modules blacklisted)")
+        
+    print("-" * 140)
+    print(f"{'Full File Path':<85} | {'File Size (MB)':<15} | {'Size of .text':<15} | {'Virtual Address':<15}")
+    print("-" * 140)
 
     for root, _, files in os.walk(target_dir):
         for file in files:
-            if not file.lower().endswith('.dll'):
+            file_lower = file.lower()
+            if not file_lower.endswith('.dll'):
+                continue
+                
+            # Gate 1: If an include list is provided, ignore everything else
+            if included_dlls and (file_lower not in included_dlls):
+                continue
+
+            # Gate 2: If an exclude list is provided, drop any matching items
+            if excluded_dlls and (file_lower in excluded_dlls):
                 continue
                 
             file_path = os.path.join(root, file)
@@ -44,7 +85,7 @@ def find_phantom_dll_candidates(target_dir, min_file_size_mb, min_text_section_s
                         
                         if v_size >= min_text_section_size:
                             file_size_mb = file_size / (1024 * 1024)
-                            print(f"{file:<40} | {file_size_mb:<15.2f} | {hex(v_size):<15} | {hex(section.VirtualAddress):<15}")
+                            print(f"{file_path:<85} | {file_size_mb:<15.2f} | {hex(v_size):<15} | {hex(section.VirtualAddress):<15}")
                             candidates.append({
                                 'path': file_path,
                                 'file_size': file_size,
@@ -55,21 +96,21 @@ def find_phantom_dll_candidates(target_dir, min_file_size_mb, min_text_section_s
             except (pefile.PEFormatError, PermissionError, FileNotFoundError):
                 continue
 
-    print("-" * 90)
-    print(f"[*] Found {len(candidates)} potential candidates.")
+    print("-" * 140)
+    print(f"[*] Found {len(candidates)} potential candidates matching the criteria.")
     return candidates
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Find DLL candidates with a specific minimum .text section size.")
+    parser = argparse.ArgumentParser(description="Find DLL candidates with targeted tracking and exclusion parameters.")
     
-    # Required size argument - parses both normal ints and hex strings
+    # Space required
     parser.add_argument(
         "size", 
         type=auto_int, 
-        help="The total required size of the .text section (e.g., 524288 or 0x80000)"
+        help="The total required size of the .text section (e.g., 0x80000)"
     )
     
-    # Optional directory argument - defaults to System32
+    # Directory to scan
     parser.add_argument(
         "-d", "--dir", 
         type=str, 
@@ -77,23 +118,44 @@ if __name__ == "__main__":
         help="Target directory to scan (default: C:\\Windows\\System32)"
     )
     
-    # Optional file size filter - defaults to 1MB
+    # Minimum size of image
     parser.add_argument(
         "-m", "--min-size", 
         type=float, 
         default=1.0, 
         help="Minimum file size on disk in MB (default: 1.0)"
     )
+    
+    # Exclude list
+    parser.add_argument(
+        "-x", "--exclude",
+        type=str,
+        default=None,
+        help="Path to a text file containing specific DLLs to EXCLUDE"
+    )
+
+    # Include list 
+    parser.add_argument(
+        "-i", "--include",
+        type=str,
+        default=None,
+        help="Path to a text file containing specific DLLs to INCLUDE"
+    )
 
     args = parser.parse_args()
 
-    # Validate target directory
     if not os.path.isdir(args.dir):
         print(f"[-] Error: '{args.dir}' is not a valid directory.")
         exit(1)
 
+    # Parse both filters independently
+    excluded_modules = parse_flat_file(args.exclude, "EXCLUDE_MODULES")
+    included_modules = parse_flat_file(args.include, "INCLUDE_MODULES")
+
     find_phantom_dll_candidates(
         target_dir=args.dir, 
         min_file_size_mb=args.min_size, 
-        min_text_section_size=args.size
+        min_text_section_size=args.size,
+        excluded_dlls=excluded_modules,
+        included_dlls=included_modules
     )
