@@ -8,8 +8,8 @@
 #include <stdio.h>
 #include <tlhelp32.h>
 
-#include "../includes/utils.h"              //  crt replacements
-#include "../includes/peb-eat-utils.h"      //  custom peb/eat walking functions
+#include "..\includes\utils.h"              //  crt replacements
+#include "..\includes\peb-eat-utils.h"      //  custom peb/eat walking functions
 
 // https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualallocex
 typedef LPVOID(WINAPI* P_VirtualAllocEx)(
