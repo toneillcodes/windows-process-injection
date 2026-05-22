@@ -12,6 +12,23 @@
 #define STATUS_SUCCESS ((NTSTATUS)0x00000000L)
 #endif
 
+// 1. Define the COMPLETE structure since winternl.h cuts out the fields we need
+typedef struct _FULL_LDR_DATA_TABLE_ENTRY {
+    LIST_ENTRY InLoadOrderLinks;
+    LIST_ENTRY InMemoryOrderLinks; // This is what we use to offset math!
+    LIST_ENTRY InInitializationOrderLinks;
+    PVOID DllBase;
+    PVOID EntryPoint;
+    ULONG SizeOfImage;
+    UNICODE_STRING FullDllName;
+    UNICODE_STRING BaseDllName;    // Now visible!
+    ULONG Flags;
+    WORD ObsoleteLoadCount;
+    WORD TlsIndex;
+    LIST_ENTRY HashLinks;
+    ULONG TimeDateStamp;
+} FULL_LDR_DATA_TABLE_ENTRY, *PFULL_LDR_DATA_TABLE_ENTRY;
+
 // Returns the TEB address for the current thread
 void* GetLocalTebAddress(void);
 

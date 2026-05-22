@@ -1,6 +1,9 @@
 #include "peb-eat-utils.h"
 #include "utils.h"
 
+// Ensure NTSTATUS success is defined
+#define STATUS_SUCCESS ((NTSTATUS)0x00000000L)
+
 // obtain the local process TEB
 void* GetLocalTebAddress(void) {
 #ifdef _WIN64
