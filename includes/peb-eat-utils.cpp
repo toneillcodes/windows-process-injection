@@ -1,10 +1,208 @@
 #include "peb-eat-utils.h"
 #include "utils.h"
+#include <stddef.h>
+#include <stdio.h>
 
-// Ensure NTSTATUS success is defined
-#define STATUS_SUCCESS ((NTSTATUS)0x00000000L)
+#define LOCAL_PROCESS_HANDLE ((HANDLE)(LONG_PTR)-1)
 
-// obtain the local process TEB
+typedef NTSTATUS(NTAPI* pNtQueryInformationProcess)(
+    HANDLE ProcessHandle,
+    ULONG ProcessInformationClass,
+    PVOID ProcessInformation,
+    ULONG ProcessInformationLength,
+    PULONG ReturnLength
+);
+
+// --- Core Internal Abstraction Layer ---
+
+BOOL ReadMemoryInternal(HANDLE hProcess, PVOID baseAddress, PVOID localBuffer, SIZE_T size) {
+    if (hProcess == NULL || hProcess == LOCAL_PROCESS_HANDLE) {
+        __try {
+            memcpy(localBuffer, baseAddress, size);
+            return TRUE;
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER) {
+            return FALSE;
+        }
+    } else {
+        SIZE_T bytesRead = 0;
+        return ReadProcessMemory(hProcess, baseAddress, localBuffer, size, &bytesRead) && (bytesRead == size);
+    }
+}
+
+BOOL GetPEHeaders(HANDLE hProcess, PVOID moduleBase, IMAGE_DOS_HEADER* outDos, IMAGE_NT_HEADERS* outNt) {
+    if (!ReadMemoryInternal(hProcess, moduleBase, outDos, sizeof(IMAGE_DOS_HEADER))) return FALSE;
+    if (outDos->e_magic != IMAGE_DOS_SIGNATURE) return FALSE;
+
+    PVOID ntHeadersAddr = (BYTE*)moduleBase + outDos->e_lfanew;
+    if (!ReadMemoryInternal(hProcess, ntHeadersAddr, outNt, sizeof(IMAGE_NT_HEADERS))) return FALSE;
+    if (outNt->Signature != IMAGE_NT_SIGNATURE) return FALSE;
+
+    return TRUE;
+}
+
+PVOID GetPebAddress(HANDLE hProcess) {
+    if (hProcess == NULL || hProcess == LOCAL_PROCESS_HANDLE) {
+#ifdef _WIN64
+        return (PVOID)__readgsqword(0x60);
+#else
+        return (PVOID)__readfsdword(0x30);
+#endif
+    }
+
+    PROCESS_BASIC_INFORMATION pbi;
+    ULONG returnLength;
+    
+    pNtQueryInformationProcess NtQueryInfo = (pNtQueryInformationProcess)GetProcAddress(
+        GetModuleHandleA("ntdll.dll"), 
+        "NtQueryInformationProcess"
+    );
+
+    if (!NtQueryInfo) return NULL;
+
+    NTSTATUS status = NtQueryInfo(hProcess, 0, &pbi, sizeof(pbi), &returnLength);
+    return (status == STATUS_SUCCESS) ? pbi.PebBaseAddress : NULL;
+}
+
+PVOID GetModuleBaseManualGeneric(HANDLE hProcess, PVOID pebAddr, const char* targetModuleName) {
+    PEB localPeb = { 0 };
+    if (!ReadMemoryInternal(hProcess, pebAddr, &localPeb, sizeof(PEB))) return NULL;
+    if (!localPeb.Ldr) return NULL;
+
+    PEB_LDR_DATA localLdr = { 0 };
+    if (!ReadMemoryInternal(hProcess, localPeb.Ldr, &localLdr, sizeof(PEB_LDR_DATA))) return NULL;
+
+    PVOID remoteListHead = (BYTE*)localPeb.Ldr + offsetof(PEB_LDR_DATA, InMemoryOrderModuleList);
+    LIST_ENTRY currentEntry = localLdr.InMemoryOrderModuleList;
+
+    WCHAR targetNameWide[MAX_PATH] = { 0 };
+    MultiByteToWideChar(CP_ACP, 0, targetModuleName, -1, targetNameWide, MAX_PATH);
+
+    while (currentEntry.Flink != remoteListHead) {
+        PVOID tableEntryAddr = CONTAINING_RECORD(currentEntry.Flink, LDR_DATA_TABLE_ENTRY_COMPAT, InMemoryOrderLinks);
+        LDR_DATA_TABLE_ENTRY_COMPAT moduleEntry = { 0 };
+
+        if (!ReadMemoryInternal(hProcess, tableEntryAddr, &moduleEntry, sizeof(LDR_DATA_TABLE_ENTRY_COMPAT))) break;
+
+        if (moduleEntry.BaseDllName.Buffer && moduleEntry.BaseDllName.Length < (MAX_PATH * sizeof(WCHAR))) {
+            WCHAR localNameBuffer[MAX_PATH] = { 0 };
+            
+            if (ReadMemoryInternal(hProcess, moduleEntry.BaseDllName.Buffer, localNameBuffer, moduleEntry.BaseDllName.Length)) {
+                localNameBuffer[moduleEntry.BaseDllName.Length / sizeof(WCHAR)] = L'\0';
+
+                if (_wcsicmp(localNameBuffer, targetNameWide) == 0) {
+                    return moduleEntry.DllBase;
+                }
+            }
+        }
+        currentEntry = moduleEntry.InMemoryOrderLinks;
+    }
+    return NULL;
+}
+
+PVOID GetProcAddressManualGeneric(HANDLE hProcess, PVOID moduleBase, const char* functionName, WORD ordinal) {
+    IMAGE_DOS_HEADER dosHeader = { 0 };
+    IMAGE_NT_HEADERS ntHeaders = { 0 };
+    if (!GetPEHeaders(hProcess, moduleBase, &dosHeader, &ntHeaders)) return NULL;
+
+    IMAGE_DATA_DIRECTORY exportDataDir = ntHeaders.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
+    if (exportDataDir.VirtualAddress == 0) return NULL;
+
+    IMAGE_EXPORT_DIRECTORY exportDir = { 0 };
+    PVOID exportDirAddr = (BYTE*)moduleBase + exportDataDir.VirtualAddress;
+    if (!ReadMemoryInternal(hProcess, exportDirAddr, &exportDir, sizeof(IMAGE_EXPORT_DIRECTORY))) return NULL;
+
+    if (functionName == NULL) {
+        // By Ordinal
+        DWORD functionIndex = ordinal - exportDir.Base;
+        if (functionIndex >= exportDir.NumberOfFunctions) return NULL;
+
+        DWORD funcRVA = 0;
+        PVOID funcRVAAddr = (BYTE*)moduleBase + exportDir.AddressOfFunctions + (functionIndex * sizeof(DWORD));
+        if (!ReadMemoryInternal(hProcess, funcRVAAddr, &funcRVA, sizeof(DWORD))) return NULL;
+
+        return (BYTE*)moduleBase + funcRVA;
+    }
+
+    // By Name (Binary Search)
+    DWORD* nameTable = (DWORD*)malloc(exportDir.NumberOfNames * sizeof(DWORD));
+    WORD* ordinalTable = (WORD*)malloc(exportDir.NumberOfNames * sizeof(WORD));
+    if (!nameTable || !ordinalTable) {
+        free(nameTable); free(ordinalTable);
+        return NULL;
+    }
+
+    ReadMemoryInternal(hProcess, (BYTE*)moduleBase + exportDir.AddressOfNames, nameTable, exportDir.NumberOfNames * sizeof(DWORD));
+    ReadMemoryInternal(hProcess, (BYTE*)moduleBase + exportDir.AddressOfNameOrdinals, ordinalTable, exportDir.NumberOfNames * sizeof(WORD));
+
+    int low = 0;
+    int high = exportDir.NumberOfNames - 1;
+    PVOID functionAddress = NULL;
+
+    while (low <= high) {
+        int mid = low + (high - low) / 2;
+        char currentName[256] = { 0 };
+        
+        PVOID nameAddress = (BYTE*)moduleBase + nameTable[mid];
+        ReadMemoryInternal(hProcess, nameAddress, currentName, sizeof(currentName) - 1);
+
+        int cmp = strcmp(functionName, currentName);
+        if (cmp == 0) {
+            WORD ordinalValue = ordinalTable[mid];
+            DWORD funcRVA = 0;
+            PVOID funcRVAAddr = (BYTE*)moduleBase + exportDir.AddressOfFunctions + (ordinalValue * sizeof(DWORD));
+            
+            if (ReadMemoryInternal(hProcess, funcRVAAddr, &funcRVA, sizeof(DWORD))) {
+                if (funcRVA >= exportDataDir.VirtualAddress && funcRVA < (exportDataDir.VirtualAddress + exportDataDir.Size)) {
+                    printf("[!] Warning: Forwarded export detected.\n");
+                    break;
+                }
+                functionAddress = (BYTE*)moduleBase + funcRVA;
+            }
+            break;
+        }
+        if (cmp < 0) high = mid - 1;
+        else low = mid + 1;
+    }
+
+    free(nameTable);
+    free(ordinalTable);
+    return functionAddress;
+}
+
+BOOL GetModuleSectionGeneric(HANDLE hProcess, PVOID moduleBase, const char* sectionName, IMAGE_SECTION_INFO* outSectionInfo) {
+    IMAGE_DOS_HEADER dosHeader = { 0 };
+    IMAGE_NT_HEADERS ntHeaders = { 0 };
+    if (!GetPEHeaders(hProcess, moduleBase, &dosHeader, &ntHeaders)) return FALSE;
+
+    PVOID sectionTableAddr = (BYTE*)moduleBase + dosHeader.e_lfanew + sizeof(DWORD) + sizeof(IMAGE_FILE_HEADER) + ntHeaders.FileHeader.SizeOfOptionalHeader;
+    WORD numberOfSections = ntHeaders.FileHeader.NumberOfSections;
+
+    IMAGE_SECTION_HEADER* sectionHeaders = (IMAGE_SECTION_HEADER*)malloc(sizeof(IMAGE_SECTION_HEADER) * numberOfSections);
+    if (!sectionHeaders) return FALSE;
+
+    if (!ReadMemoryInternal(hProcess, sectionTableAddr, sectionHeaders, sizeof(IMAGE_SECTION_HEADER) * numberOfSections)) {
+        free(sectionHeaders);
+        return FALSE;
+    }
+
+    BOOL found = FALSE;
+    for (WORD i = 0; i < numberOfSections; i++) {
+        if (strncmp((char*)sectionHeaders[i].Name, sectionName, IMAGE_SIZEOF_SHORT_NAME) == 0) {
+            outSectionInfo->VirtualAddress = (BYTE*)moduleBase + sectionHeaders[i].VirtualAddress;
+            outSectionInfo->SizeOfRawData = sectionHeaders[i].SizeOfRawData;
+            outSectionInfo->VirtualSize = sectionHeaders[i].Misc.VirtualSize;
+            found = TRUE;
+            break;
+        }
+    }
+
+    free(sectionHeaders);
+    return found;
+}
+
+// --- Exported Public API Wrappers ---
+
 void* GetLocalTebAddress(void) {
 #ifdef _WIN64
     return (void*)__readgsqword(0x30);
@@ -13,175 +211,30 @@ void* GetLocalTebAddress(void) {
 #endif
 }
 
-// todo: test and validation for remote PEB
-typedef NTSTATUS (NTAPI *pNtQueryInformationProcess)(
-    HANDLE ProcessHandle,
-    PROCESSINFOCLASS ProcessInformationClass,
-    PVOID ProcessInformation,
-    ULONG ProcessInformationLength,
-    PULONG ReturnLength
-);
-
-// todo: test and validation for remote PEB
-PVOID GetRemotePebAddress(HANDLE hProcess) {
-    PROCESS_BASIC_INFORMATION pbi;
-    ULONG returnLength;
-    
-    // get the address of NtQueryInformationProcess
-    // this could be replaced with a manual lookup through the local PEB to avoid GetProcAddress
-    pNtQueryInformationProcess NtQueryInfo = (pNtQueryInformationProcess)GetProcAddress(
-        GetModuleHandleA("ntdll.dll"), 
-        "NtQueryInformationProcess"
-    );
-
-    // Query the process for the PEB address
-    NTSTATUS status = NtQueryInfo(
-        hProcess, 
-        ProcessBasicInformation, // Value 0
-        &pbi, 
-        sizeof(pbi), 
-        &returnLength
-    );
-
-    if (status == STATUS_SUCCESS) {
-        return pbi.PebBaseAddress;
-    }
-    
-    return NULL;
-}
-
-// find the address of an exported function within a given module
-// depends on a name value being present in the array found at AddressOfNames
-PVOID GPAManualByName(HMODULE hMod, char* targetFunc) {
-    PBYTE base = (PBYTE)hMod;
-
-    PIMAGE_DOS_HEADER dos = (PIMAGE_DOS_HEADER)base;
-    PIMAGE_NT_HEADERS nt = (PIMAGE_NT_HEADERS)(base + dos->e_lfanew);
-
-    IMAGE_DATA_DIRECTORY exportDataDir = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
-    if (exportDataDir.VirtualAddress == 0) return NULL;
-
-    PIMAGE_EXPORT_DIRECTORY exports = (PIMAGE_EXPORT_DIRECTORY)(base + exportDataDir.VirtualAddress);
-
-    PDWORD names = (PDWORD)(base + exports->AddressOfNames);
-    PWORD ordinals = (PWORD)(base + exports->AddressOfNameOrdinals);
-    PDWORD functions = (PDWORD)(base + exports->AddressOfFunctions);
-
-    // --- Binary Search Logic Start ---
-    int low = 0;
-    int high = exports->NumberOfNames - 1;
-
-    while (low <= high) {
-        int mid = low + (high - low) / 2;
-        char* currentName = (char*)(base + names[mid]);
-
-        int cmp = my_strcmp(targetFunc, currentName);
-
-        if (cmp == 0) {
-            // Match found!
-            WORD ordinalValue = ordinals[mid];
-            DWORD funcRVA = functions[ordinalValue];
-
-            // Forwarder Check
-            if (funcRVA >= exportDataDir.VirtualAddress &&
-                funcRVA < (exportDataDir.VirtualAddress + exportDataDir.Size)) {
-                // Add more forwarder logic here
-                return NULL;
-            }
-
-            return (PVOID)(base + funcRVA);
-        }
-
-        if (cmp < 0) {
-            high = mid - 1; // Target is in the lower half
-        }
-        else {
-            low = mid + 1;  // Target is in the upper half
-        }
-    }
-    // --- Binary Search Logic End ---
-
-    return NULL;
-}
-
-// find the address of an exported function within a given module
-PVOID GPAManualByOrdinal(HMODULE hMod, WORD ordinal) {
-    PBYTE base = (PBYTE)hMod;
-
-    // Navigate to the Export Directory (standard PE parsing)
-    PIMAGE_DOS_HEADER dos = (PIMAGE_DOS_HEADER)base;
-    PIMAGE_NT_HEADERS nt = (PIMAGE_NT_HEADERS)(base + dos->e_lfanew);
-    PIMAGE_EXPORT_DIRECTORY exports = (PIMAGE_EXPORT_DIRECTORY)(base +
-        nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress);
-
-    // Adjust the ordinal
-    DWORD functionIndex = ordinal - exports->Base;
-
-    // Bounds check
-    if (functionIndex >= exports->NumberOfFunctions) return NULL;
-
-    // Get the RVA from the functions array
-    PDWORD functionsArray = (PDWORD)(base + exports->AddressOfFunctions);
-    DWORD funcRVA = functionsArray[functionIndex];
-
-    return (PVOID)(base + funcRVA);
+PVOID GetRemotePebAddress(HANDLE hProcess) { 
+    return GetPebAddress(hProcess); 
 }
 
 PVOID GetModuleBaseManual(PPEB pebObject, const char* targetModuleName) {
-    // we want the ldr data
-    PPEB_LDR_DATA ldr = pebObject->Ldr;
-    PLIST_ENTRY listHead = &ldr->InMemoryOrderModuleList;
-    PLIST_ENTRY currentEntry = listHead->Flink;
+    return GetModuleBaseManualGeneric(LOCAL_PROCESS_HANDLE, (PVOID)pebObject, targetModuleName);
+}
 
-    // traverse the doubly-linked list, if we ouroboros we're done
-    while (currentEntry != listHead) {
-        // InMemoryOrderLinks is the second field in LDR_DATA_TABLE_ENTRY
-        // use CONTAINING_RECORD to snap back to the start of the structure
-        LDR_DATA_TABLE_ENTRY* moduleEntry = (LDR_DATA_TABLE_ENTRY*)CONTAINING_RECORD(
-            currentEntry,
-            LDR_DATA_TABLE_ENTRY,
-            InMemoryOrderLinks
-        );
-      
-        UNICODE_STRING fileName = moduleEntry->FullDllName;
-        //printf("fileName = %wZ\n", fileName);
-        PVOID moduleBase = moduleEntry->DllBase;
-        // get DOS Header
-        PIMAGE_DOS_HEADER dosHeader = (PIMAGE_DOS_HEADER)moduleBase;
-        if (dosHeader->e_magic != IMAGE_DOS_SIGNATURE) {
-            printf("Invalid DOS Signature\n");
-            return NULL;
-        }
+PVOID GetModuleBaseManualRemote(HANDLE hProcess, PVOID remotePebAddr, const char* targetModuleName) {
+    return GetModuleBaseManualGeneric(hProcess, remotePebAddr, targetModuleName);
+}
 
-        // get NT Headers using the offset from DOS Header
-        PIMAGE_NT_HEADERS ntHeaders = (PIMAGE_NT_HEADERS)((BYTE*)moduleBase + dosHeader->e_lfanew);
-        if (ntHeaders->Signature != IMAGE_NT_SIGNATURE) {
-            printf("Invalid NT Signature\n");
-            return NULL;
-        }
-        
-        // Locate the Export Directory in the Data Directory
-        IMAGE_DATA_DIRECTORY exportDataDir = ntHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
-        if (exportDataDir.VirtualAddress == 0) {
-            // does this case matter? maybe with debug enabled
-            //printf("No Export Table found for entry  %wZ\n", &fileName);
-        }
-        else {
-            PIMAGE_EXPORT_DIRECTORY exportDir = (PIMAGE_EXPORT_DIRECTORY)((BYTE*)moduleBase + exportDataDir.VirtualAddress);
-            char* moduleName = NULL;
-            moduleName = (char*)((BYTE*)moduleBase + exportDir->Name);        
-            
-            if (moduleName != NULL) {
-                // todo: case insensitive would be better, the names are not consistent
-                // examples: ntdll.dll, USER32.dll, KERNEL32.DLL
-                //if (my_strcmp(moduleName, targetModuleName) == 0) {
-                if (my_stricmp(moduleName, targetModuleName) == 0) {
-                    return moduleBase;                  
-                }
-            }
-        }
-        currentEntry = currentEntry->Flink;
-    }
+PVOID GPAManualByName(HMODULE hMod, char* targetFunc) {
+    return GetProcAddressManualGeneric(LOCAL_PROCESS_HANDLE, (PVOID)hMod, targetFunc, 0);
+}
 
-    return NULL;
+PVOID GPAManualByOrdinal(HMODULE hMod, WORD ordinal) {
+    return GetProcAddressManualGeneric(LOCAL_PROCESS_HANDLE, (PVOID)hMod, NULL, ordinal);
+}
+
+PVOID GetRemoteProcAddressManual(HANDLE hProcess, PVOID moduleBase, const char* functionName) {
+    return GetProcAddressManualGeneric(hProcess, moduleBase, functionName, 0);
+}
+
+BOOL GetRemoteModuleSection(HANDLE hProcess, PVOID moduleBase, const char* sectionName, IMAGE_SECTION_INFO* outSectionInfo) {
+    return GetModuleSectionGeneric(hProcess, moduleBase, sectionName, outSectionInfo);
 }

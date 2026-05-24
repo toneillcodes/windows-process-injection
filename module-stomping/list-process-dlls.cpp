@@ -1,3 +1,7 @@
+/*
+* Outputs the DLLs loaded by a process with optional flags to display names only and write to a file
+* compile: cl.exe /D"UNICODE" /D"_UNICODE" list-process-dlls.cpp ..\includes\peb-eat-utils.cpp ..\includes\utils.cpp ..\includes\ps-utils.cpp
+*/
 #include <stdio.h>
 #include <stdbool.h> // Ensure bool, true, and false are explicitly supported
 
