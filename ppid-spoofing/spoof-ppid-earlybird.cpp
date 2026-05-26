@@ -2,6 +2,7 @@
 #include <stdio.h>
 
 #include "..\includes\utils.h"              //  crt replacements
+#include "..\includes\ps-utils.h"           //  process functions
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
@@ -33,7 +34,7 @@ int main(int argc, char* argv[]) {
     PROCESS_INFORMATION pi = { 0 };
     SIZE_T attributeSize = 0;
 
-    DWORD parentPid = GetExplorerPID();
+    DWORD parentPid = FindPidByName(L"explorer.exe");
     if (parentPid == 0) return -1;
 
     HANDLE hParent = OpenProcess(PROCESS_CREATE_PROCESS, FALSE, parentPid);

@@ -242,6 +242,7 @@ c:\Users\Administrator\Desktop\module-stomping>
 ```
 
 ## Execution Steps
+### Stomping in the Current Process
 The `local-stomp.cpp` example follows this execution logic:
 
 1. **Load Target DLL:** Use `LoadLibraryExA` with the `DONT_RESOLVE_DLL_REFERENCES` flag to map a "sacrificial" DLL into the process without executing its entry point.
@@ -250,6 +251,17 @@ The `local-stomp.cpp` example follows this execution logic:
 4. **Write Payload:** Use `WriteProcessMemory` or `RtlCopyMemory` to stomp the payload over the legitimate instructions.
 5. **Reprotect (Execute):** Revert the memory permissions back to Read-Execute (`RX`).
 6. **Execution:** Trigger the shellcode using a thread execution API (e.g., `CreateThread` or `CreateRemoteThread`).
+### Stomping in a Remote Process
+The `remote-stomp.cpp` example follows this execution logic:  
+
+1. **Acquire Process Handle:** Open a handle to the target remote process via OpenProcess using the supplied Process ID (PID) with the required access rights.
+2. **Locate Remote PEB:** Query the target process to find its remote Process Environment Block (PEB) address using internal utility routines.
+3. **Parse Remote Modules:** Walk the remote process's InMemoryOrderModuleList to dynamically locate the base address of a loaded target module (e.g., KERNEL32.dll).
+4. **Identify Section / Export Target:** Verify the boundaries of the executable .text section, and locate a specific target function address (e.g., FileTimeToSystemTime) within that module via manual Export Address Table (EAT) parsing.
+5. **Reprotect (Write):** Call VirtualProtectEx to change the target function's memory permissions in the remote process from Read-Execute (RX) to Read-Write (RW).
+6. **Write Payload:** Use WriteProcessMemory to stomp the shellcode payload directly over the legitimate instructions of the identified remote export.
+7. **Reprotect (Execute):** Revert the remote memory permissions back to Read-Execute (RX) via VirtualProtectEx.
+8. **Execution:** Trigger the payload within the target process context using a remote execution API (e.g., CreateRemoteThread) pointing directly to the stomped function address.
 
 ## OPSEC Considerations
 
