@@ -1,3 +1,7 @@
+/*
+* compile: cl.exe spoof-ppid-earlybird.cpp ..\includes\utils.cpp ..\includes\ps-utils.cpp
+*/
+
 #include <windows.h>
 #include <stdio.h>
 

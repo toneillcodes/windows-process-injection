@@ -54,7 +54,7 @@ int main() {
         printf("[ERROR] Failed to obtain DLL handle! Error: %lu\n", GetLastError());
         return -1;
     }
-    printf("[*] Target DDL loaded.\n");
+    printf("[*] Target DLL loaded.\n");
     
     LPVOID bufferAddress = (LPVOID)GetProcAddress(hSacrificialDll, "CommitUrlCacheEntryW");  
     if (bufferAddress == NULL) {
