@@ -2,7 +2,7 @@
 * Local module stomping: load a sacrificial DLL into the process memory, locate a function to stomp (it'll be within the .text section, this is lazy)
 *                        & inject calc.exe msfvenom shellcode into the target buffer, toggling the memory protection between RW and RWX
 * shellcode: msfvenom -p windows/x64/exec CMD=calc.exe -f C EXITFUNC=thread
-* compile: cl.exe local-stomp.cpp /W0 /D"UNICODE" /D"_UNICODE"
+* compile: cl.exe local-stomp.cpp /W0
 */
 #include <windows.h>
 #include <stdio.h>
