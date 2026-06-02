@@ -25,6 +25,23 @@ typedef struct _LDR_DATA_TABLE_ENTRY_COMPAT {
     UNICODE_STRING BaseDllName;
 } LDR_DATA_TABLE_ENTRY_COMPAT, *PLDR_DATA_TABLE_ENTRY_COMPAT;
 
+// Define the COMPLETE structure since winternl.h cuts out the fields we need
+typedef struct _FULL_LDR_DATA_TABLE_ENTRY {
+    LIST_ENTRY InLoadOrderLinks;
+    LIST_ENTRY InMemoryOrderLinks;
+    LIST_ENTRY InInitializationOrderLinks;
+    PVOID DllBase;
+    PVOID EntryPoint;
+    ULONG SizeOfImage;
+    UNICODE_STRING FullDllName;
+    UNICODE_STRING BaseDllName;
+    ULONG Flags;
+    WORD ObsoleteLoadCount;
+    WORD TlsIndex;
+    LIST_ENTRY HashLinks;
+    ULONG TimeDateStamp;
+} FULL_LDR_DATA_TABLE_ENTRY, *PFULL_LDR_DATA_TABLE_ENTRY;
+
 // --- Forward Declarations of Public API Functions ---
 void* GetLocalTebAddress(void);
 PVOID GetRemotePebAddress(HANDLE hProcess);

@@ -61,7 +61,7 @@ int main() {
     
     LPVOID targetAddress = (LPVOID)GetProcAddress(hSacrificialDll, "CommitUrlCacheEntryW");  
     if (targetAddress == NULL) {
-        printf("[ERROR] Failed to locate target function CommitUrlCacheEntryW! Error: %lu\n", pid, GetLastError());
+        printf("[ERROR] Failed to locate target function CommitUrlCacheEntryW! Error: %lu\n", GetLastError());
         return -1;
     }
     printf("[*] Target wininet.dll!CommitUrlCacheEntryW located at: 0x%016llx\n", targetAddress);

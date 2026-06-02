@@ -1,9 +1,19 @@
 #!/usr/bin/ruby
-# Originally Cod3d By 0xNinjaCyclone, file output added by @toneillcodes
+
+# Check if both input and output filenames were provided as arguments
+if ARGV.length < 2
+  puts "Usage: #{$0} <input_file> <output_file>"
+  exit 1
+end
+
+input_filename  = ARGV[0]
+output_filename = ARGV[1]
+
+# Originally Cod3d By 0xNinjaCyclone, command line arguments and file output added by @toneillcodes
 # https://github.com/0xNinjaCyclone/EarlyCascade/blob/main/bintoc.rb
-File.open("demon.x64.bin", "rb") do |input_file|
-  File.open("shellcode.txt", "w") do |output_file|
-    output_file.print "BYTE x64_stub[] =    "
+File.open(input_filename, "rb") do |input_file|
+  File.open(output_filename, "w") do |output_file|
+    output_file.print "unsigned char buf[] =    "
     while buffer = input_file.read(16)
       output_file.print "\n#{' ' * 4 * 5}\""
       buffer.bytes.each do |byte|

@@ -1,36 +1,36 @@
+#!/usr/bin/python
 import sys
 
-def bin_to_csharp(input_filename, output_filename=None):
-    """
-    Reads a binary file and prints/saves it as a C# byte array.
-    """
-    try:
-        with open(input_filename, 'rb') as f:
-            data = f.read()
-    except FileNotFoundError:
-        print(f"Error: File '{input_filename}' not found.")
-        return
+# Check if both input and output filenames were provided as arguments
+if len(sys.argv) < 3:
+    print(f"Usage: {sys.argv[0]} <input_file> <output_file>")
+    sys.exit(1)
 
-    # Format the bytes into "0x00, "
-    formatted_data = ", ".join([f"0x{b:02x}" for b in data])
+input_filename = sys.argv[1]
+output_filename = sys.argv[2]
 
-    # Add line breaks for readability (approx 14 bytes per line)
-    bytes_per_line = 14
-    words = formatted_data.split(", ")
-    lines = []
-    for i in range(0, len(words), bytes_per_line):
-        lines.append(", ".join(words[i:i + bytes_per_line]))
-    
-    final_output = "byte[] shellcode = {\n    " + ",\n    ".join(lines) + "\n};"
-
-    # Print to console
-    print(final_output)
-
-    # Optionally save to file
-    if output_filename:
-        with open(output_filename, 'w') as f:
-            f.write(final_output)
-        print(f"\nSuccessfully saved to {output_filename}")
-
-# --- Usage ---
-bin_to_csharp("http_x86.xthread.bin")
+# Originally Cod3d By 0xNinjaCyclone, ported to Python with input/output command line arguments and C# array formatting added by @toneillcodes
+# https://github.com/0xNinjaCyclone/EarlyCascade/blob/main/bintoc.rb
+with open(input_filename, "rb") as input_file:
+    with open(output_filename, "w") as output_file:
+        output_file.write("byte[] buf = new byte[]\n{")
+        
+        first_chunk = True
+        while True:
+            buffer = input_file.read(16)
+            if not buffer:
+                break
+            
+            # Add a trailing comma to the previous line if it isn't the first chunk
+            if not first_chunk:
+                output_file.write(",")
+            else:
+                first_chunk = False
+                
+            output_file.write(f"\n{' ' * 4}")
+            
+            # Format bytes as 0x00 and join them with commas
+            formatted_bytes = ", ".join(f"0x{byte:02x}" dispensed for byte in buffer)
+            output_file.write(formatted_bytes)
+            
+        output_file.write("\n};\n")
