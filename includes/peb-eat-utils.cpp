@@ -41,29 +41,6 @@ BOOL GetPEHeaders(HANDLE hProcess, PVOID moduleBase, IMAGE_DOS_HEADER* outDos, I
     return TRUE;
 }
 
-PVOID GetPebAddress(HANDLE hProcess) {
-    if (hProcess == NULL || hProcess == LOCAL_PROCESS_HANDLE) {
-#ifdef _WIN64
-        return (PVOID)__readgsqword(0x60);
-#else
-        return (PVOID)__readfsdword(0x30);
-#endif
-    }
-
-    PROCESS_BASIC_INFORMATION pbi;
-    ULONG returnLength;
-    
-    pNtQueryInformationProcess NtQueryInfo = (pNtQueryInformationProcess)GetProcAddress(
-        GetModuleHandleA("ntdll.dll"), 
-        "NtQueryInformationProcess"
-    );
-
-    if (!NtQueryInfo) return NULL;
-
-    NTSTATUS status = NtQueryInfo(hProcess, 0, &pbi, sizeof(pbi), &returnLength);
-    return (status == STATUS_SUCCESS) ? pbi.PebBaseAddress : NULL;
-}
-
 PVOID GetModuleBaseManualGeneric(HANDLE hProcess, PVOID pebAddr, const char* targetModuleName) {
     PEB localPeb = { 0 };
     if (!ReadMemoryInternal(hProcess, pebAddr, &localPeb, sizeof(PEB))) return NULL;
@@ -168,6 +145,45 @@ PVOID GetProcAddressManualGeneric(HANDLE hProcess, PVOID moduleBase, const char*
     free(nameTable);
     free(ordinalTable);
     return functionAddress;
+}
+
+PVOID GetPebAddress(HANDLE hProcess) {
+    if (hProcess == NULL || hProcess == LOCAL_PROCESS_HANDLE) {
+#ifdef _WIN64
+        return (PVOID)__readgsqword(0x60);
+#else
+        return (PVOID)__readfsdword(0x30);
+#endif
+    }
+
+    // --- Bootstrap our own API resolution via the local PEB ---
+    // Get the local PEB base address silently
+#ifdef _WIN64
+    PVOID localPeb = (PVOID)__readgsqword(0x60);
+#else
+    localPeb = (PVOID)__readfsdword(0x30);
+#endif
+
+    // Locate ntdll.dll locally using a custom module parser (replaces GetModuleHandle)
+    PVOID localNtdllBase = GetModuleBaseManualGeneric(LOCAL_PROCESS_HANDLE, localPeb, "ntdll.dll");
+    if (!localNtdllBase) return NULL;
+
+    // Locate NtQueryInformationProcess using a custom EAT parser (replaces GetProcAddress)
+    pNtQueryInformationProcess CustomNtQueryInfoProcess = (pNtQueryInformationProcess)GetProcAddressManualGeneric(
+        LOCAL_PROCESS_HANDLE, 
+        localNtdllBase, 
+        "NtQueryInformationProcess", 
+        0
+    );
+    if (!CustomNtQueryInfoProcess) return NULL;
+
+    // --- Perform the Query ---
+    PROCESS_BASIC_INFORMATION pbi;
+    ULONG returnLength;
+    
+    // Call the manually resolved function pointer
+    NTSTATUS status = CustomNtQueryInfoProcess(hProcess, 0, &pbi, sizeof(pbi), &returnLength);
+    return (status == STATUS_SUCCESS) ? pbi.PebBaseAddress : NULL;
 }
 
 BOOL GetModuleSectionGeneric(HANDLE hProcess, PVOID moduleBase, const char* sectionName, IMAGE_SECTION_INFO* outSectionInfo) {

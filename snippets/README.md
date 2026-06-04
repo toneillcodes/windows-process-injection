@@ -7,18 +7,3 @@
 * [getpid.cpp](getpid.cpp): FindPidByName implementation and example
 * [syscallhunter.cpp](syscallhunter.cpp)
 * [syscalls.asm](syscalls.asm)
-
-## Useful PowerShell
-### Finding Microsoft Edge
-```
-Get-CimInstance Win32_Process -Filter "Name = 'msedge.exe' AND CommandLine LIKE '%msedge.exe%'" | 
-    Where-Object { $_.CommandLine -notlike '*--type=*' } |
-    Select-Object ProcessId, CommandLine | 
-    Format-List
-```
-
-```
-Get-CimInstance Win32_Process -Filter "Name = 'msedge.exe' AND CommandLine LIKE '%msedge.exe%'" | 
-    Where-Object { $_.CommandLine -notlike '*--type=*' } |
-    Select-Object ProcessId	
-```

@@ -42,6 +42,21 @@ typedef struct _FULL_LDR_DATA_TABLE_ENTRY {
     ULONG TimeDateStamp;
 } FULL_LDR_DATA_TABLE_ENTRY, *PFULL_LDR_DATA_TABLE_ENTRY;
 
+// Thread Information Class for TEB queries
+#define ThreadTebInformation 26
+
+typedef struct _THREAD_TEB_INFORMATION {
+    PVOID TebInformation;
+} THREAD_TEB_INFORMATION, *PTHREAD_TEB_INFORMATION;
+
+typedef NTSTATUS(NTAPI* pNtQueryInformationThread)(
+    HANDLE ThreadHandle,
+    ULONG ThreadInformationClass,
+    PVOID ThreadInformation,
+    ULONG ThreadInformationLength,
+    PULONG ReturnLength
+);
+
 // --- Forward Declarations of Public API Functions ---
 void* GetLocalTebAddress(void);
 PVOID GetRemotePebAddress(HANDLE hProcess);
