@@ -26,7 +26,9 @@ Get-CimInstance Win32_Process -Filter "Name = 'msedge.exe' AND CommandLine LIKE 
 |----|----|----|----|----|----|----|
 | msedge | 148.0.3967.96 | ffmpeg.dll | avcodec_open2 | 287930 | success | Stable during normal browsing |
 | chrome | 148.0.7778.218 | ExplorerFrame.dll | DllCanUnloadNow | 287930 | success | Stable during normal browsing, crashed on file download |
+| chrome | 148.0.7778.218 | ExplorerFrame.dll | DllGetVersion | 287930 | success | Stable during normal browsing, downloads work |
 | firefox | 151.0.3 | ExplorerFrame.dll | DllCanUnloadNow | 287930 | success | Stable during normal browsing, crashed on file download |
+| firefox | 151.0.3 | ExplorerFrame.dll | DllGetVersion | 287930 | success | Stable during normal browsing, downloads work |
 
 ## Module Lists
 ### Chrome
