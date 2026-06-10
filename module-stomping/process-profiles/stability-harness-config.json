@@ -1,0 +1,44 @@
+[ 
+{
+  "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+  "trigger_dll": "comctl32.dll",
+  "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+  "tool_arguments": ["-p", "{pid}", "-d", "wininet.dll", "-f", "InternetSetOptionW"],
+  "timeout_seconds": 60
+},
+{
+  "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+  "trigger_dll": "comctl32.dll",
+  "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+  "tool_arguments": ["-p", "{pid}", "-d", "wininet.dll", "-f", "DeleteUrlCacheEntry"],
+  "timeout_seconds": 60
+},
+{
+  "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+  "trigger_dll": "comctl32.dll",
+  "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+  "tool_arguments": ["-p", "{pid}", "-d", "wininet.dll", "-f", "DeleteUrlCacheEntryA"],
+  "timeout_seconds": 60
+},
+{
+  "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+  "trigger_dll": "comctl32.dll",
+  "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+  "tool_arguments": ["-p", "{pid}", "-d", "wininet.dll", "-f", "IsHostInProxyBypassList"],
+  "timeout_seconds": 60
+},
+{
+  "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+  "trigger_dll": "comctl32.dll",
+  "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+  "tool_arguments": ["-p", "{pid}", "-d", "wininet.dll", "-f", "InternetInitializeAutoProxyDll"],
+  "timeout_seconds": 60
+},
+{
+  "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+  "trigger_dll": "comctl32.dll",
+  "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+  "tool_arguments": ["-p", "{pid}", "-d", "wininet.dll", "-f", "ShowCertificate"],
+  "timeout_seconds": 60
+}
+]

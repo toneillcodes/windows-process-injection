@@ -6,10 +6,13 @@ LOG_FILE = "active_telemetry.jsonl"
 # TOGGLE FLAG: Set to True for Chrome/Browsers, False for Notepad++/Single apps
 ENABLE_CHILD_GATING = False  
 
+# CONNECTION MODE: Set to a running PID (e.g., 1234) to attach, or None to spawn fresh
+TARGET_PID = 10032  
+
 # The JavaScript instrumentation payload to inject
 JS_CODE = """
 const seenFunctions = new Set();
-const moduleName = "wininet.dll";
+const moduleName = "uxtheme.dll";
 
 function instrumentModule() {
     try {
@@ -81,35 +84,46 @@ def on_child_added(child):
 # Initialize device manager
 device = frida.get_local_device()
 
-# Configure target binary path and flags
-# TARGET_PATH = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+# Configure fallback spawn target path and flags
 TARGET_PATH = r"C:\Program Files\Notepad++\notepad++.exe"
 TARGET_FLAGS = [TARGET_PATH]
 
 try:
-    print(f"[*] Bootstrapping instrumentation loop for {TARGET_PATH}...")
-    print(f"[*] Child Gating Status: {'ENABLED' if ENABLE_CHILD_GATING else 'DISABLED'}")
-    
-    # 1. Conditionally register the device-level callback
+    # 1. Conditionally register child gating callbacks if enabled
     if ENABLE_CHILD_GATING:
         device.on('child-added', on_child_added)
 
-    # 2. Spawn the process with the configured gating flag
-    pid = device.spawn(TARGET_FLAGS, child_gating=ENABLE_CHILD_GATING)
-    session = device.attach(pid)
+    # 2. Establish Session based on connection mode (Attach vs Spawn)
+    if TARGET_PID is not None:
+        print(f"[*] Attaching to existing process PID: {TARGET_PID}...")
+        session = device.attach(TARGET_PID)
+        pid = TARGET_PID
+        should_resume = False
+    else:
+        print(f"[*] Bootstrapping fresh instance for {TARGET_PATH}...")
+        pid = device.spawn(TARGET_FLAGS, child_gating=ENABLE_CHILD_GATING)
+        session = device.attach(pid)
+        should_resume = True
+
+    print(f"[*] Child Gating Status: {'ENABLED' if ENABLE_CHILD_GATING else 'DISABLED'}")
     
     # 3. Conditionally enable session-level child tracking
     if ENABLE_CHILD_GATING:
         session.enable_child_gating()
     
-    # Load script into the primary parent process
+    # Load script into the target process session
     script = session.create_script(JS_CODE)
     script.on('message', on_message)
     script.load()
     
-    device.resume(pid)
-    print(f"[+] Root process running at PID {pid}. Press Ctrl+C to stop tracking.\n" + "="*80)
-    
+    # 4. Only resume if we spawned it suspended
+    if should_resume:
+        device.resume(pid)
+        print(f"[+] Root process spawned and running at PID {pid}.")
+    else:
+        print(f"[+] Successfully attached to running PID {pid}.")
+        
+    print("[*] Telemetry active. Press Ctrl+C to stop tracking.\n" + "="*80)
     sys.stdin.read()
 
 except KeyboardInterrupt:

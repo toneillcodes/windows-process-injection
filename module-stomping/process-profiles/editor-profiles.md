@@ -3,7 +3,8 @@
 ## Module Testing Table
 | Process | Version Tested | Target Module | Target Function | Payload Size | Beacon Result | Notes |
 |----|----|----|----|----|----|----|
-| notepad++.exe | 8.9.3 | wininet.dll | InternetSetOptionW | 287930 | execution | Crashed on 'Open File' operation |
+| Code.exe | 1.105.1 | wininet.dll | ShowCertificate | 287930 | success | Stable during typical usage | 
+| notepad++.exe | 8.9.3 | wininet.dll | InternetSetOptionW | 287930 | execution, unstable | Crashed on 'Open File' operation |
 | notepad++.exe | 8.9.3 | wininet.dll | ShowCertificate | 287930 | success | Stable during normal browsing |
 | sublime_text.exe | Build 4200 | wininet.dll | InternetSetOptionW | 287930 | success | Stable during typical usage |
 | sublime_text.exe | Build 4200 | wininet.dll | ShowCertificate | 287930 | success | Stable during typical usage |
