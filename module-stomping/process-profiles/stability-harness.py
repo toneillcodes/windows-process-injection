@@ -1,10 +1,13 @@
+import os
+import sys
+import time
 import json
 import subprocess
-import time
-import os
+
+LOG_MANIFEST = "execution_telemetry_results.jsonl"
 
 def is_module_loaded(pid, module_name):
-    """Checks if a specific DLL is loaded by the target PID via tasklist."""
+    """Verifies if the designated DLL dependency has settled in target space."""
     try:
         cmd = ["tasklist", "/FI", f"PID eq {pid}", "/M", module_name]
         result = subprocess.run(cmd, capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
@@ -12,91 +15,152 @@ def is_module_loaded(pid, module_name):
     except Exception:
         return False
 
-def run_configured_test(config_path):
+def log_test_metric(iteration, target, module, status, exit_code, duration):
+    """Commits test-case analytical records to a raw JSONL log manifest."""
+    entry = {
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "iteration": iteration,
+        "target_binary": os.path.basename(target),
+        "evaluated_module": module,
+        "status": status,
+        "kernel_exit_code": hex(exit_code) if isinstance(exit_code, int) else exit_code,
+        "execution_duration_sec": round(duration, 2)
+    }
+    with open(LOG_MANIFEST, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry) + "\n")
+        f.flush()
+
+def run_parametric_campaign(config_path):
     if not os.path.exists(config_path):
-        print(f"[-] Configuration file not found: {config_path}")
+        print(f"[-] Error: Configuration file not found at {config_path}")
         return
 
-    # 1. Parse configuration parameters safely
     try:
         with open(config_path, "r", encoding="utf-8") as f:
-            config = json.load(f)
+            profiles = json.load(f)
             
-        target = config["target_executable"]
-        trigger_dll = config["trigger_dll"]
-        tool = config["secondary_tool"]
-        tool_args = config.get("tool_arguments", [])
-        timeout_sec = config.get("timeout_seconds", 60)
+        # If the JSON file is just a single object configuration instead of a list, wrap it in a list
+        if isinstance(profiles, dict):
+            profiles = [profiles]
+            
     except Exception as e:
-        print(f"[-] Failed to parse JSON configuration: {e}")
+        print(f"[-] Failed to read JSON configuration: {e}")
         return
 
-    print(f"[*] Loaded profile for: {os.path.basename(target)}")
-    
-    # 2. Start the primary process
-    process = subprocess.Popen([target])
-    pid = process.pid
-    print(f"[+] Started primary process {pid} normally.")
+    print(f"[*] Initializing Process Stability Campaign with {len(profiles)} profiles.")
+    print("=" * 80)
 
-    # 3. Poll until the dependency module settles
-    print(f"[*] Waiting for {trigger_dll} to stabilize in memory...")
-    start_time = time.time()
-    module_found = False
-    
-    while time.time() - start_time < 10:  # 10s initialization boundary
-        if is_module_loaded(pid, trigger_dll):
-            module_found = True
-            print(f"[+] Verified {trigger_dll} mapping established.")
-            break
-        time.sleep(0.2)
+    for idx, profile in enumerate(profiles, start=1):
+        # Defensive Check: Ensure the item is actually a dictionary structure
+        if not isinstance(profile, dict):
+            print(f"[-] Skipping entry #{idx}: Expected a JSON object/dictionary but got {type(profile).__name__}.")
+            continue
+
+        target = profile.get("target_executable")
+        trigger_dll = profile.get("trigger_dll")
+        tool = profile.get("secondary_tool")
+        tool_args = profile.get("tool_arguments", [])
+        timeout_sec = profile.get("timeout_seconds", 60)
+
+        # Ensure required configuration parameters are present before spinning up processes
+        if not target or not trigger_dll:
+            print(f"[-] Skipping entry #{idx}: Missing 'target_executable' or 'trigger_dll'.")
+            continue
+
+        print(f"[-] Executing Profile {idx}/{len(profiles)}: {os.path.basename(target)}")
         
-        if process.poll() is not None:
-            print("[-] Primary process terminated during initialization.")
-            return
+        # Environmental Sanity Check: Ensure no hanging instances remain
+        binary_name = os.path.basename(target)
+        subprocess.run(f"taskkill /f /im {binary_name} >nul 2>&1", shell=True)
+        time.sleep(0.5)
 
-    if not module_found:
-        print(f"[-] Warning: {trigger_dll} not explicitly verified. Proceeding...")
+        start_time = time.time()
+        process = None
+        secondary_process = None
 
-    # 4. Resolve arguments and launch secondary tool
-    cmd_line = [tool] + [arg.replace("{pid}", str(pid)) if isinstance(arg, str) else str(arg) for arg in tool_args]
-    print(f"[+] Launching companion process: {' '.join(cmd_line)}")
-    secondary_process = subprocess.Popen(cmd_line)
+        try:
+            # 1. Spawn main application process
+            process = subprocess.Popen([target])
+            pid = process.pid
+            print(f"    [+] Spawned target process host with PID: {pid}")
 
-    # 5. Monitor execution life cycle up to the timeout threshold
-    print(f"[*] Monitoring execution stability window ({timeout_sec}s)...")
-    try:
-        exit_code = process.wait(timeout=timeout_sec)
-        
-        # Interpret termination exit codes
-        STATUS_ACCESS_VIOLATION = -1073741819      # 0xC0000005
-        STATUS_INVALID_CRUNTIME = -1073740777      # 0xC0000417
-        STATUS_INVALID_CRUNTIME_ALT = 3221225622
-        
-        if exit_code in [STATUS_ACCESS_VIOLATION, 0xC0000005]:
-            print("[!] Stability Fault: Process crashed due to an Access Violation (0xC0000005).")
-        elif exit_code in [STATUS_INVALID_CRUNTIME, STATUS_INVALID_CRUNTIME_ALT]:
-            print("[!] Stability Fault: Process forced closure via Invalid CRT Parameter (0xC0000417).")
-        elif exit_code != 0:
-            print(f"[!] Process stopped prematurely with exit code: {exit_code}")
-        else:
-            print(f"[+] Process completed run cleanly with exit code: {exit_code}")
+            # 2. Wait for dependency structure validation
+            module_found = False
+            init_timeout = 10
+            init_start = time.time()
+            
+            while time.time() - init_start < init_timeout:
+                if is_module_loaded(pid, trigger_dll):
+                    module_found = True
+                    break
+                time.sleep(0.2)
+                if process.poll() is not None:
+                    break
 
-    except subprocess.TimeoutExpired:
-        print(f"[+] Stability Window Met: Process handled workload successfully for {timeout_sec}s.")
-    except KeyboardInterrupt:
-        print("[-] Execution stopped by user.")
-    finally:
-        print("[+] Performing environmental cleanup...")
-        if process.poll() is None:
-            process.kill()
-            process.wait()
-        if secondary_process.poll() is None:
-            try:
-                secondary_process.kill()
-                secondary_process.wait()
-            except OSError:
-                pass
+            if not module_found:
+                print(f"    [!] Warning: Dependency {trigger_dll} not verified in memory context.")
+
+            # give the process a little time to initialize
+            time.sleep(10)
+
+            # 3. Resolve arguments and link secondary utility tool
+            if tool:
+                cmd_line = [tool] + [arg.replace("{pid}", str(pid)) if isinstance(arg, str) else str(arg) for arg in tool_args]
+                print(f"    [+] Executing companion tool: {' '.join(cmd_line)}")
+                secondary_process = subprocess.Popen(cmd_line)
+            else:
+                print("    [*] No secondary companion tool specified for this profile.")
+
+            # 4. Monitor performance across the defined timeout boundary
+            print(f"    [*] Monitoring stability layout for {timeout_sec}s maximum...")
+            exit_code = process.wait(timeout=timeout_sec)
+            
+            # Process terminated early; interpret exit code
+            duration = time.time() - start_time
+            
+            # Map standard exception codes
+            STATUS_ACCESS_VIOLATION = -1073741819      # 0xC0000005
+            STATUS_INVALID_CRUNTIME = -1073740777      # 0xC0000417
+            STATUS_INVALID_CRUNTIME_ALT = 3221225622
+            
+            if exit_code in [STATUS_ACCESS_VIOLATION, 0xC0000005]:
+                status_str = "TERMINATED_ACCESS_VIOLATION"
+                print("    [!] Result: Access Violation Fault Detected.")
+            elif exit_code in [STATUS_INVALID_CRUNTIME, STATUS_INVALID_CRUNTIME_ALT]:
+                status_str = "TERMINATED_CRT_FAILURE"
+                print("    [!] Result: Invalid Parameter Runtime Closure Detected.")
+            elif exit_code != 0:
+                status_str = f"TERMINATED_UNEXPECTED_CODE"
+                print(f"    [!] Result: Finished with abnormal return code: {exit_code}")
+            else:
+                status_str = "TERMINATED_CLEAN"
+                print("    [+] Result: Process finished cleanly prior to timeout.")
+
+            log_test_metric(idx, target, trigger_dll, status_str, exit_code, duration)
+
+        except subprocess.TimeoutExpired:
+            # Application successfully survived the duration requirements
+            duration = time.time() - start_time
+            print(f"    [+] Result: Process maintained stability for full {timeout_sec}s.")
+            log_test_metric(idx, target, trigger_dll, "STABLE_TIMEOUT_REACHED", "STABLE", duration)
+
+        finally:
+            # Thorough teardown processing per iteration loop
+            if process and process.poll() is None:
+                process.kill()
+                process.wait()
+            if secondary_process and secondary_process.poll() is None:
+                try:
+                    secondary_process.kill()
+                    secondary_process.wait()
+                except OSError:
+                    pass
 
 if __name__ == "__main__":
-    CONFIG_FILE = "stability-harness-config.json"
-    run_configured_test(CONFIG_FILE)
+    #MANIFEST_FILE = "config.json"
+    #MANIFEST_FILE = "c:\payloads\msedge-module-test-plan.json"    
+    #MANIFEST_FILE = "c:\payloads\chrome-test-plan.json"
+    #MANIFEST_FILE = "c:\payloads\\firefox-test-plan.json"      # crash detection logic messed with results
+    #MANIFEST_FILE = "c:\payloads\\notepadpp-test.plan.json"
+    MANIFEST_FILE = "c:\payloads\sublime-test-plan.json"
+    run_parametric_campaign(MANIFEST_FILE)
