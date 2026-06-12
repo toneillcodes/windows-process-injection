@@ -8,7 +8,7 @@
 #endif
 
 typedef struct _IMAGE_SECTION_INFO {
-    PVOID VirtualAddress;
+    DWORD VirtualAddress;
     DWORD SizeOfRawData;
     DWORD VirtualSize;
 } IMAGE_SECTION_INFO, *PIMAGE_SECTION_INFO;
@@ -28,13 +28,13 @@ typedef struct _LDR_DATA_TABLE_ENTRY_COMPAT {
 // Define the COMPLETE structure since winternl.h cuts out the fields we need
 typedef struct _FULL_LDR_DATA_TABLE_ENTRY {
     LIST_ENTRY InLoadOrderLinks;
-    LIST_ENTRY InMemoryOrderLinks;
+    LIST_ENTRY InMemoryOrderLinks; 
     LIST_ENTRY InInitializationOrderLinks;
     PVOID DllBase;
     PVOID EntryPoint;
     ULONG SizeOfImage;
     UNICODE_STRING FullDllName;
-    UNICODE_STRING BaseDllName;
+    UNICODE_STRING BaseDllName;    
     ULONG Flags;
     WORD ObsoleteLoadCount;
     WORD TlsIndex;
@@ -57,12 +57,23 @@ typedef NTSTATUS(NTAPI* pNtQueryInformationThread)(
     PULONG ReturnLength
 );
 
+// Minimum required definitions for the Process Parameters
+typedef struct _RTL_USER_PROCESS_PARAMETERS_LITE {
+    BYTE Reserved1[16];
+    PVOID Reserved2[10];
+    UNICODE_STRING ImagePathName;
+    UNICODE_STRING CommandLine;
+} RTL_USER_PROCESS_PARAMETERS_LITE, *PRTL_USER_PROCESS_PARAMETERS_LITE;
+
 // --- Forward Declarations of Public API Functions ---
 void* GetLocalTebAddress(void);
 PVOID GetRemotePebAddress(HANDLE hProcess);
 
 PVOID GetModuleBaseManual(PPEB pebObject, const char* targetModuleName);
 PVOID GetModuleBaseManualRemote(HANDLE hProcess, PVOID remotePebAddr, const char* targetModuleName);
+
+WCHAR* GetRemoteProcessImagePathEx(HANDLE hProcess, PPEB pLocalPebContent);
+WCHAR* GetRemoteProcessImagePath(HANDLE hProcess);
 
 PVOID GPAManualByName(HMODULE hMod, char* targetFunc);
 PVOID GPAManualByOrdinal(HMODULE hMod, WORD ordinal);
