@@ -73,6 +73,21 @@ def run_parametric_campaign(config_path, log_manifest_path):
         subprocess.run(f"taskkill /f /im {binary_name} >nul 2>&1", shell=True)
         time.sleep(0.5)
 
+        # If the target is Word, remove the Resiliency key so it forgets past crashes
+        if "winword.exe" == binary_name.lower():
+            # Force delete the key (and all subkeys) quietly
+            subprocess.run(r'reg delete "HKCU\Software\Microsoft\Office\16.0\Word\Resiliency" /f >nul 2>&1', shell=True)
+            # Pre-emptively enforce the bypass switch just in case
+            subprocess.run(r'reg add "HKCU\Software\Microsoft\Office\16.0\Word\Resiliency" /v "DoNotShowSafeModeLauncher" /t REG_DWORD /d 1 /f >nul 2>&1', shell=True)
+
+            # Note: The path 16.0 in the registry string covers Office 2016, 2019, 2021, and Microsoft 365. 
+            # If you happen to be testing older legacy environments, you'll just need to adjust that number (15.0 for Office 2013, 14.0 for Office 2010).
+
+        time.sleep(0.5)
+
+        start_time = time.time()
+        process = None
+
         start_time = time.time()
         process = None
         secondary_process = None
