@@ -1,5 +1,3 @@
-
-
 import json
 
 # Paths to your data files

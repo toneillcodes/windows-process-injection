@@ -3,8 +3,7 @@ import sys
 import time
 import json
 import subprocess
-
-LOG_MANIFEST = "execution_telemetry_results.jsonl"
+import argparse
 
 def is_module_loaded(pid, module_name):
     """Verifies if the designated DLL dependency has settled in target space."""
@@ -15,7 +14,7 @@ def is_module_loaded(pid, module_name):
     except Exception:
         return False
 
-def log_test_metric(iteration, target, module, status, exit_code, duration):
+def log_test_metric(log_manifest_path, iteration, target, module, status, exit_code, duration):
     """Commits test-case analytical records to a raw JSONL log manifest."""
     entry = {
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -26,11 +25,11 @@ def log_test_metric(iteration, target, module, status, exit_code, duration):
         "kernel_exit_code": hex(exit_code) if isinstance(exit_code, int) else exit_code,
         "execution_duration_sec": round(duration, 2)
     }
-    with open(LOG_MANIFEST, "a", encoding="utf-8") as f:
+    with open(log_manifest_path, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry) + "\n")
         f.flush()
 
-def run_parametric_campaign(config_path):
+def run_parametric_campaign(config_path, log_manifest_path):
     if not os.path.exists(config_path):
         print(f"[-] Error: Configuration file not found at {config_path}")
         return
@@ -136,13 +135,13 @@ def run_parametric_campaign(config_path):
                 status_str = "TERMINATED_CLEAN"
                 print("    [+] Result: Process finished cleanly prior to timeout.")
 
-            log_test_metric(idx, target, trigger_dll, status_str, exit_code, duration)
+            log_test_metric(log_manifest_path, idx, target, trigger_dll, status_str, exit_code, duration)
 
         except subprocess.TimeoutExpired:
             # Application successfully survived the duration requirements
             duration = time.time() - start_time
             print(f"    [+] Result: Process maintained stability for full {timeout_sec}s.")
-            log_test_metric(idx, target, trigger_dll, "STABLE_TIMEOUT_REACHED", "STABLE", duration)
+            log_test_metric(log_manifest_path, idx, target, trigger_dll, "STABLE_TIMEOUT_REACHED", "STABLE", duration)
 
         finally:
             # Thorough teardown processing per iteration loop
@@ -157,10 +156,21 @@ def run_parametric_campaign(config_path):
                     pass
 
 if __name__ == "__main__":
-    #MANIFEST_FILE = "config.json"
-    #MANIFEST_FILE = "c:\payloads\msedge-module-test-plan.json"    
-    #MANIFEST_FILE = "c:\payloads\chrome-test-plan.json"
-    #MANIFEST_FILE = "c:\payloads\\firefox-test-plan.json"      # crash detection logic messed with results
-    #MANIFEST_FILE = "c:\payloads\\notepadpp-test.plan.json"
-    MANIFEST_FILE = "c:\payloads\sublime-test-plan.json"
-    run_parametric_campaign(MANIFEST_FILE)
+    parser = argparse.ArgumentParser(description="Process Stability Testing Campaign Runner")
+    
+    # Required Stability Plan Argument
+    parser.add_argument(
+        "-p", "--plan", 
+        required=True, 
+        help="Absolute path to the target stability plan JSON configuration file."
+    )
+    
+    # Optional Log Manifest Argument
+    parser.add_argument(
+        "-l", "--log",
+        default="execution_telemetry_results.jsonl",
+        help="Path where the analytical JSONL log manifest should be saved (default: execution_telemetry_results.jsonl)."
+    )
+    
+    args = parser.parse_args()
+    run_parametric_campaign(args.plan, args.log)
