@@ -1,0 +1,812 @@
+[
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "ntdll.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "ntdll.dll",
+      "-n",
+      "-s",
+      "1486492"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "KERNEL32.DLL",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "KERNEL32.DLL",
+      "-n",
+      "-s",
+      "543476"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "KERNELBASE.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "KERNELBASE.dll",
+      "-n",
+      "-s",
+      "1718575"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "apphelp.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "apphelp.dll",
+      "-n",
+      "-s",
+      "360865"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "AcGenral.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "AcGenral.dll",
+      "-n",
+      "-s",
+      "293980"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "msvcrt.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "msvcrt.dll",
+      "-n",
+      "-s",
+      "509769"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "sechost.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "sechost.dll",
+      "-n",
+      "-s",
+      "447180"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "SHLWAPI.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "SHLWAPI.dll",
+      "-n",
+      "-s",
+      "236875"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "ucrtbase.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "ucrtbase.dll",
+      "-n",
+      "-s",
+      "1007457"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "USER32.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "USER32.dll",
+      "-n",
+      "-s",
+      "688110"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "win32u.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "win32u.dll",
+      "-n",
+      "-s",
+      "48310"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "GDI32.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "GDI32.dll",
+      "-n",
+      "-s",
+      "56758"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "gdi32full.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "gdi32full.dll",
+      "-n",
+      "-s",
+      "733884"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "msvcp_win.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "msvcp_win.dll",
+      "-n",
+      "-s",
+      "331562"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "ole32.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "ole32.dll",
+      "-n",
+      "-s",
+      "875596"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "combase.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "combase.dll",
+      "-n",
+      "-s",
+      "2530466"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "RPCRT4.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "RPCRT4.dll",
+      "-n",
+      "-s",
+      "867993"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "advapi32.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "advapi32.dll",
+      "-n",
+      "-s",
+      "443160"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "shcore.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "shcore.dll",
+      "-n",
+      "-s",
+      "623064"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "SHELL32.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "SHELL32.dll",
+      "-n",
+      "-s",
+      "5939252"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "wintypes.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "wintypes.dll",
+      "-n",
+      "-s",
+      "660248"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "USERENV.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "USERENV.dll",
+      "-n",
+      "-s",
+      "91420"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "MPR.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "MPR.dll",
+      "-n",
+      "-s",
+      "75828"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "SspiCli.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "SspiCli.dll",
+      "-n",
+      "-s",
+      "140604"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "IMM32.DLL",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "IMM32.DLL",
+      "-n",
+      "-s",
+      "118854"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "COMDLG32.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "COMDLG32.dll",
+      "-n",
+      "-s",
+      "741422"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "WININET.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "WININET.dll",
+      "-n",
+      "-s",
+      "1923468"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "COMCTL32.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "COMCTL32.dll",
+      "-n",
+      "-s",
+      "2002140"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "dwmapi.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "dwmapi.dll",
+      "-n",
+      "-s",
+      "99792"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "UxTheme.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "UxTheme.dll",
+      "-n",
+      "-s",
+      "429288"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "OPENGL32.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "OPENGL32.dll",
+      "-n",
+      "-s",
+      "839436"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "GLU32.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "GLU32.dll",
+      "-n",
+      "-s",
+      "121595"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "dxcore.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "dxcore.dll",
+      "-n",
+      "-s",
+      "175484"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "CRYPTBASE.DLL",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "CRYPTBASE.DLL",
+      "-n",
+      "-s",
+      "11206"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "ninput.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "ninput.dll",
+      "-n",
+      "-s",
+      "379612"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "OLEAUT32.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "OLEAUT32.dll",
+      "-n",
+      "-s",
+      "646878"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "windows.storage.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "windows.storage.dll",
+      "-n",
+      "-s",
+      "6605902"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "MSCTF.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "MSCTF.dll",
+      "-n",
+      "-s",
+      "1134448"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "dwrite.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "dwrite.dll",
+      "-n",
+      "-s",
+      "1649724"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "bcryptPrimitives.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "bcryptPrimitives.dll",
+      "-n",
+      "-s",
+      "512297"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "kernel.appcore.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "kernel.appcore.dll",
+      "-n",
+      "-s",
+      "38176"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "clbcatq.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "clbcatq.dll",
+      "-n",
+      "-s",
+      "460268"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "twinapi.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "twinapi.dll",
+      "-n",
+      "-s",
+      "600508"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "XmlLite.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "XmlLite.dll",
+      "-n",
+      "-s",
+      "198892"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "ntmarta.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "ntmarta.dll",
+      "-n",
+      "-s",
+      "142812"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "TextShaping.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "TextShaping.dll",
+      "-n",
+      "-s",
+      "322828"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "dataexchange.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "dataexchange.dll",
+      "-n",
+      "-s",
+      "244548"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "twinapi.appcore.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "twinapi.appcore.dll",
+      "-n",
+      "-s",
+      "1666810"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "OneCoreUAPCommonProxyStub.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "OneCoreUAPCommonProxyStub.dll",
+      "-n",
+      "-s",
+      "44352"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "textinputframework.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "textinputframework.dll",
+      "-n",
+      "-s",
+      "1019148"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "CoreMessaging.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "CoreMessaging.dll",
+      "-n",
+      "-s",
+      "856437"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "CoreUIComponents.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "CoreUIComponents.dll",
+      "-n",
+      "-s",
+      "1687376"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "dcomp.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "dcomp.dll",
+      "-n",
+      "-s",
+      "1648652"
+    ],
+    "timeout_seconds": 60
+  },
+  {
+    "target_executable": "C:\\Program Files\\Sublime Text\\sublime_text.exe",
+    "trigger_dll": "Microsoft.Internal.WarpPal.dll",
+    "secondary_tool": "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe",
+    "tool_arguments": [
+      "-p",
+      "{pid}",
+      "-d",
+      "Microsoft.Internal.WarpPal.dll",
+      "-n",
+      "-s",
+      "61190"
+    ],
+    "timeout_seconds": 60
+  }
+]
