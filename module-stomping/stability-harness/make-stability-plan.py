@@ -3,10 +3,10 @@ import csv
 import json
 import sys
 
-STOMP_PATH = "C:\\Users\\Administrator\\Desktop\\git\\windows-process-injection\\module-stomping\\remote-stomp.exe"
-TIMEOUT = 60
+# Default fallback value for optional parameters
+DEFAULT_TIMEOUT = 60
 
-def transform_data(csv_file_path, json_file_path):
+def transform_data(csv_file_path, json_file_path, stomp_path, timeout_seconds):
     transformed_data = []
 
     try:
@@ -23,9 +23,9 @@ def transform_data(csv_file_path, json_file_path):
                     json_entry = {
                         "target_executable": targetProcess,
                         "trigger_dll": targetModule,
-                        "secondary_tool": STOMP_PATH,
+                        "secondary_tool": stomp_path,
                         "tool_arguments": ["-p", "{pid}", "-d", targetModule, "-n", "-s", targetSectionSize],
-                        "timeout_seconds": TIMEOUT,
+                        "timeout_seconds": timeout_seconds,
                     }
 
                     transformed_data.append(json_entry)
@@ -34,8 +34,8 @@ def transform_data(csv_file_path, json_file_path):
             json.dump(transformed_data, json_file, indent=2)
 
         print(f"Success! Processed {len(transformed_data)} rows.")
-        print(f"Input:  {csv_file_path}")
-        print(f"Output: {json_file_path}")
+        print(f"Input:   {csv_file_path}")
+        print(f"Output:  {json_file_path}")
 
     except FileNotFoundError:
         print(f"Error: The file '{csv_file_path}' was not found.")
@@ -55,7 +55,7 @@ if __name__ == "__main__":
         "-i",
         "--input",
         required=True,
-        help="Path to the input CSV file (must contain field2 and field3 headers).",
+        help="Path to the input CSV file.",
     )
     parser.add_argument(
         "-o",
@@ -63,9 +63,22 @@ if __name__ == "__main__":
         required=True,
         help="Path where the output JSON file should be saved.",
     )
+    parser.add_argument(
+        "-s",
+        "--stomp-path",
+        required=True,
+        help="Path to the stomp executable.",
+    )
+    parser.add_argument(
+        "-t",
+        "--timeout",
+        type=int,
+        default=DEFAULT_TIMEOUT,
+        help=f"Timeout value in seconds (default: {DEFAULT_TIMEOUT}).",
+    )
 
     # Parse the arguments from the command line
     args = parser.parse_args()
 
-    # Run the transformation logic
-    transform_data(args.input, args.output)
+    # Run the transformation logic with the mandatory parameters
+    transform_data(args.input, args.output, args.stomp_path, args.timeout)
