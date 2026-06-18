@@ -1,4 +1,5 @@
 import os
+import csv
 import argparse
 import pefile
 
@@ -33,26 +34,27 @@ def parse_flat_file(file_path, list_type_label):
         
     return names_set
 
-def find_phantom_dll_candidates(target_dir, min_file_size_mb, min_text_section_size, excluded_dlls, included_dlls):
+def find_phantom_dll_candidates(target_dir, min_file_size_mb, min_text_section_size, excluded_dlls, included_dlls, log_file=None, console_output=True):
     """
     Scans a directory for DLLs matching structural criteria.
-    Supports exclusion filters (blacklists) and targeted scope filters (whitelists).
+    Supports exclusion filters, targeted scope filters, and conditional pipeline logging.
     """
     min_file_size_bytes = min_file_size_mb * 1024 * 1024
     candidates = []
 
-    print(f"[*] Scanning Target Directory: '{target_dir}'")
-    print(f"[*] Filtering for Files      : > {min_file_size_mb}MB")
-    print(f"[*] Required .text Space     : {hex(min_text_section_size)} bytes")
-    
-    if included_dlls:
-        print(f"[*] Targeted Include Filter  : Active ({len(included_dlls)} specific targets allowed)")
-    if excluded_dlls:
-        print(f"[*] Exclusion Filter         : Active ({len(excluded_dlls)} modules blacklisted)")
+    if console_output:
+        print(f"[*] Scanning Target Directory: '{target_dir}'")
+        print(f"[*] Filtering for Files      : > {min_file_size_mb}MB")
+        print(f"[*] Required .text Space     : {hex(min_text_section_size)} bytes")
         
-    print("-" * 140)
-    print(f"{'Full File Path':<85} | {'File Size (MB)':<15} | {'Size of .text':<15} | {'Virtual Address':<15}")
-    print("-" * 140)
+        if included_dlls:
+            print(f"[*] Targeted Include Filter  : Active ({len(included_dlls)} specific targets allowed)")
+        if excluded_dlls:
+            print(f"[*] Exclusion Filter         : Active ({len(excluded_dlls)} modules blacklisted)")
+            
+        print("-" * 140)
+        print(f"{'Full File Path':<85} | {'File Size (MB)':<15} | {'Size of .text':<15} | {'Virtual Address':<15}")
+        print("-" * 140)
 
     for root, _, files in os.walk(target_dir):
         for file in files:
@@ -60,11 +62,11 @@ def find_phantom_dll_candidates(target_dir, min_file_size_mb, min_text_section_s
             if not file_lower.endswith('.dll'):
                 continue
                 
-            # Gate 1: If an include list is provided, ignore everything else
+            # Gate 1: Include lookup list filter bounds
             if included_dlls and (file_lower not in included_dlls):
                 continue
 
-            # Gate 2: If an exclude list is provided, drop any matching items
+            # Gate 2: Exclude lookup blacklist filter bounds
             if excluded_dlls and (file_lower in excluded_dlls):
                 continue
                 
@@ -85,62 +87,57 @@ def find_phantom_dll_candidates(target_dir, min_file_size_mb, min_text_section_s
                         
                         if v_size >= min_text_section_size:
                             file_size_mb = file_size / (1024 * 1024)
-                            print(f"{file_path:<85} | {file_size_mb:<15.2f} | {hex(v_size):<15} | {hex(section.VirtualAddress):<15}")
+                            if console_output:
+                                print(f"{file_path:<85} | {file_size_mb:<15.2f} | {hex(v_size):<15} | {hex(section.VirtualAddress):<15}")
+                            
                             candidates.append({
-                                'path': file_path,
-                                'file_size': file_size,
-                                'text_virtual_size': v_size
+                                'Name': file, # Base filename matches list-process-dlls paradigm expect layouts
+                                'TextSectionSize': v_size
                             })
                         break 
                         
             except (pefile.PEFormatError, PermissionError, FileNotFoundError):
                 continue
 
-    print("-" * 140)
-    print(f"[*] Found {len(candidates)} potential candidates matching the criteria.")
+    if console_output:
+        print("-" * 140)
+        print(f"[*] Found {len(candidates)} potential candidates matching the criteria.")
+
+    # --- PIPELINE SEAMLESS AUTOMATION EXPORT ---
+    if log_file and candidates:
+        # Field structure exactly matching list-process-dlls layout configuration needs
+        fieldnames = ['Name', 'TextSectionSize']
+        try:
+            with open(log_file, mode='w', newline='', encoding='utf-8') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                for cand in candidates:
+                    writer.writerow({
+                        'Name': cand['Name'],
+                        'TextSectionSize': cand['TextSectionSize']
+                    })
+            print(f"[+] Operational structural blueprint saved to: '{log_file}'")
+        except Exception as file_err:
+            print(f"[-] Error: Failed to write pipeline target spreadsheet: {file_err}")
+
     return candidates
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Find DLL candidates with targeted tracking and exclusion parameters.")
     
-    # Space required
-    parser.add_argument(
-        "size", 
-        type=auto_int, 
-        help="The total required size of the .text section (e.g., 0x80000)"
-    )
+    # Positionals & core targets
+    parser.add_argument("size", type=auto_int, help="The total required size of the .text section (e.g., 0x80000)")
+    parser.add_argument("-d", "--dir", type=str, default=r"C:\Windows\System32", help="Target directory to scan (default: C:\\Windows\\System32)")
+    parser.add_argument("-m", "--min-size", type=float, default=1.0, help="Minimum file size on disk in MB (default: 1.0)")
     
-    # Directory to scan
-    parser.add_argument(
-        "-d", "--dir", 
-        type=str, 
-        default=r"C:\Windows\System32", 
-        help="Target directory to scan (default: C:\\Windows\\System32)"
-    )
-    
-    # Minimum size of image
-    parser.add_argument(
-        "-m", "--min-size", 
-        type=float, 
-        default=1.0, 
-        help="Minimum file size on disk in MB (default: 1.0)"
-    )
-    
-    # Exclude list
-    parser.add_argument(
-        "-x", "--exclude",
-        type=str,
-        default=None,
-        help="Path to a text file containing specific DLLs to EXCLUDE"
-    )
+    # Flat configurations files switches
+    parser.add_argument("-x", "--exclude", type=str, default=None, help="Path to a text file containing specific DLLs to EXCLUDE")
+    parser.add_argument("-i", "--include", type=str, default=None, help="Path to a text file containing specific DLLs to INCLUDE")
 
-    # Include list 
-    parser.add_argument(
-        "-i", "--include",
-        type=str,
-        default=None,
-        help="Path to a text file containing specific DLLs to INCLUDE"
-    )
+    # Pipeline output and terminal display switches
+    parser.add_argument("-l", "--log", type=str, default=None, help="Destination pipeline tracking file path to export CSV output parameters.")
+    parser.add_argument("-c", "--console", dest="console", action="store_true", default=True, help="Print structured layout results table directly to screen terminal (Default).")
+    parser.add_argument("--no-console", dest="console", action="store_false", help="Suppress terminal visual representation during backend background tasks loops.")
 
     args = parser.parse_args()
 
@@ -148,7 +145,7 @@ if __name__ == "__main__":
         print(f"[-] Error: '{args.dir}' is not a valid directory.")
         exit(1)
 
-    # Parse both filters independently
+    # Parse flat filters definitions
     excluded_modules = parse_flat_file(args.exclude, "EXCLUDE_MODULES")
     included_modules = parse_flat_file(args.include, "INCLUDE_MODULES")
 
@@ -157,5 +154,7 @@ if __name__ == "__main__":
         min_file_size_mb=args.min_size, 
         min_text_section_size=args.size,
         excluded_dlls=excluded_modules,
-        included_dlls=included_modules
+        included_dlls=included_modules,
+        log_file=args.log,
+        console_output=args.console
     )
