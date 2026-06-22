@@ -1,4 +1,5 @@
 #include "syscall-utils.h"
+#include "peb-eat-utils.h"
 
 extern "C" DWORD GetSSN(PVOID functionAddress) {
     BYTE* ptr = (BYTE*)functionAddress;
@@ -37,4 +38,20 @@ extern "C" PVOID GetSyscallAddress(PVOID functionAddress) {
 		}
 	}
 	return NULL;
+}
+
+// Modular logic to obtain SSNs by name, resolved through the PEB using the custom toolkit
+DWORD GetSSNByName(PPEB peb, const char* funcName) {
+    if (!peb || !funcName) return 0;
+
+    // Locate ntdll base from the provided PEB
+    HMODULE hNtdll = (HMODULE)GetModuleBaseManual(peb, "ntdll.dll");
+    if (!hNtdll) return 0;
+
+    // Resolve function address using your manual EAT parser
+    PVOID functionAddress = GPAManualByName(hNtdll, (char*)funcName);
+    if (!functionAddress) return 0;
+
+    // 3. Extract SSN
+    return GetSSN(functionAddress);
 }
