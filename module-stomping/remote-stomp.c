@@ -70,11 +70,11 @@ int main(int argc, char *argv[]) {
         } else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
             hasOffset = TRUE;
             // Parse the string as a hexadecimal value (handles both "0x1A" and "1A" format variants)
-            textOffset = (DWORD)strtoul(argv[++i], NULL, 16);
+            textOffset = strtoul(argv[++i], NULL, 16);
         } else if (strcmp(argv[i], "-n") == 0) {
             nopMode = TRUE;
         } else if (strcmp(argv[i], "-s") == 0 && i + 1 < argc) {
-            nopSize = (DWORD)my_atoi(argv[++i]);
+            nopSize = my_atoi(argv[++i]);
         } else {
             printf("[ERROR] Invalid or incomplete argument: %s\n", argv[i]);
             PrintUsage(argv[0]);
