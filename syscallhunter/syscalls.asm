@@ -8,9 +8,10 @@ GetSSNFromAddress PROC
     mov r9, 0           ; Counter for our search loop
 
 search_loop:
-    ; Check if we've searched too far (e.g., 32 bytes)
-    cmp r9, 32
-    je not_found
+    ; Limit search to 28 bytes so that reading a 4-byte immediate value
+    ; afterwards never crosses our 32-byte boundary limit.
+    cmp r9, 28          
+    jge not_found       ; If we hit index 28, stop to prevent out-of-bounds
 
     ; Look for 0xB8 (mov eax, ...)
     cmp byte ptr [r8 + r9], 0B8h
@@ -20,13 +21,12 @@ search_loop:
     jmp search_loop
 
 found_ssn:
-    ; The SSN starts at the byte after 0xB8
-    inc r9
-    mov eax, dword ptr [r8 + r9]
+    ; Securely grab the 4-byte SSN immediately following the 0xB8 opcode
+    mov eax, dword ptr [r8 + r9 + 1]
     ret
 
 not_found:
-    xor eax, eax        ; Return 0 if not found
+    xor eax, eax        ; Return 0 if not found or unsafe to read
     ret
 GetSSNFromAddress ENDP
 
