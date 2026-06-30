@@ -2,7 +2,7 @@
 #include <tlhelp32.h>
 #include <wchar.h>
 
-extern "C" DWORD FindPidByName(const wchar_t* processName) {
+DWORD FindPidByName(const wchar_t* processName) {
     DWORD pid = 0;
     // Force the Wide-character version of the struct
     PROCESSENTRY32W entry; 

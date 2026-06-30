@@ -1,7 +1,7 @@
 #include "syscall-utils.h"
 #include "peb-eat-utils.h"
 
-extern "C" DWORD GetSSN(PVOID functionAddress) {
+DWORD GetSSN(PVOID functionAddress) {
     BYTE* ptr = (BYTE*)functionAddress;
 
     /* We are looking for the 'mov eax, SSN' instruction.
@@ -28,7 +28,7 @@ extern "C" DWORD GetSSN(PVOID functionAddress) {
 }
 
 // Simplified logic to find the 'syscall' opcode (0x0F 0x05)
-extern "C" PVOID GetSyscallAddress(PVOID functionAddress) {
+PVOID GetSyscallAddress(PVOID functionAddress) {
 	BYTE* ptr = (BYTE*)functionAddress;
 	
 	// Search the first 32 bytes of the function for the syscall instruction 0f 05

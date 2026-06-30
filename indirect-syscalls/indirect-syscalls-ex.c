@@ -1,6 +1,6 @@
 /*
 * ml64.exe /c indirect-syscalls.asm
-* cl.exe indirect-syscalls-ex.c ..\includes\peb-eat-utils.c ..\includes\ps-utils.c ..\includes\syscall-utils.c indirect-syscalls.obj /Fe:indirect-syscalls.exe
+* cl.exe indirect-syscalls-ex.c ..\includes\peb-eat-utils.c ..\includes\syscall-utils.c ..\includes\ps-utils.c indirect-syscalls.obj /Fe:indirect-syscalls.exe
 */
 #include <stdio.h>
 #include "..\includes\syscall-utils.h"

