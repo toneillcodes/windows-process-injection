@@ -13,15 +13,14 @@ void print_usage(const char *app_name) {
 }
 
 int main(int argc, char* argv[]) {
-    int targetPid = 0;
-    int apiMethod = 0;
-    char *targetModule = NULL;
-    char *targetExport = NULL;
-    DWORD targetOffset = 0;
-
-    SYSCALL_FLAVOR apiInvocationMethod = FLAVOR_WIN32;
+    // default to DFR
+    SYSCALL_FLAVOR apiInvocationMethod = FLAVOR_DFR;
     
+    // initialize the context
     INJECTION_CONTEXT ctx = { 0 };
+    ctx.spawnTarget = FALSE;
+    ctx.spawnPath = NULL;
+    ctx.targetPid = 0;
     ctx.payloadSize = sizeof(mockShellcode);
     ctx.targetModule = NULL;
     ctx.targetExport = NULL;
@@ -32,6 +31,15 @@ int main(int argc, char* argv[]) {
     engine.Write    = DefaultWrite;
     engine.Protect  = DefaultProtect;
     engine.Invoke   = DefaultInvoke;
+
+    // local variables for argument parsing
+    BOOL spawnTarget = FALSE;
+    char *spawnPath = NULL;
+    int targetPid = 0;
+    int apiMethod = 0;
+    char *targetModule = NULL;
+    char *targetExport = NULL;
+    DWORD targetOffset = 0;   
 
     printf("--- Processing Arguments ---\n");
     for (int i = 1; i < argc; i++) {
@@ -51,10 +59,17 @@ int main(int argc, char* argv[]) {
         // ---- Target PID ----
         if (strcmp(arg, "-p") == 0 || strcmp(arg, "--pid") == 0) {
             FETCH_OPTARG();
-            targetPid = (int)strtol(optarg, NULL, 0);
+            ctx.targetPid = (int)strtol(optarg, NULL, 0);
             printf("[*] Using PI parameter targetPid = %d\n", targetPid);            
         } 
         
+        else if (strcmp(arg, "-s") == 0 || strcmp(arg, "--spawn") == 0) {
+            FETCH_OPTARG();
+            free(spawnPath);
+            ctx.spawnPath = optarg;
+            printf("[*] Using PI parameter spawnPath = %s\n", ctx.spawnPath);            
+        }
+
         // ---- API Method ----
         else if (strcmp(arg, "-a") == 0 || strcmp(arg, "--api") == 0) {
             FETCH_OPTARG();
@@ -125,20 +140,13 @@ int main(int argc, char* argv[]) {
 
     printf("--- Executing Process Injection ---\n");
 
-    printf("[*] Attempting to open the target process.\n");
-    HANDLE pHandle;
-    if(targetPid == 0){
-        printf("[*] No PID provided, targeting the current process.\n");
-        targetPid = GetCurrentProcessId();
+    BOOL spawnProcess = FALSE;
+    if(ctx.spawnPath != NULL) {
+        if(ctx.targetPid != 0) {
+            printf("[!] Warning: a target PID and a process to spawn were both provided.\n    Defaulting to spawning the process provided.\n    Check your parameters.\n");
+        }
+        spawnProcess = TRUE;
     }
-    // Open a handle to the target process
-    pHandle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, targetPid);
-    if (pHandle == NULL) {
-        printf("Failed to acquire process handle!\n");
-        return -1;
-    }
-
-    ctx.hProcess = pHandle;
 
     if (EngineExecute(&engine, &ctx, mockShellcode, apiInvocationMethod, PAGE_EXECUTE_READ)) {
         printf("[*] Pipeline execution complete.\n");
@@ -152,6 +160,9 @@ int main(int argc, char* argv[]) {
             // Sleep(2000); 
             
             CloseHandle(ctx.hThread);
+            if(spawnProcess) {
+                CloseHandle(ctx.hProcess);
+            }
         }
     }
 
