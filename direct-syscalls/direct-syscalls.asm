@@ -2,12 +2,15 @@
 ; Function: NtAllocateVirtualMemory
 ; SSN:      0x0018
 ;
+; Function: NtProtectVirtualMemory
+; SSN:      0x0050
+;
 ; Function: NtWriteVirtualMemory
 ; SSN:      0x003A
 ;
 ; Function: NtCreateThreadEx
 ; SSN:      0x00C9
-; 
+;
 ; Function: NtWaitForSingleObject
 ; SSN:      0x0004
 ;
@@ -34,6 +37,21 @@ SysNtAllocateVirtualMemory PROC
     ret                 ; Return to the caller. The NTSTATUS result 
                         ; will be stored in the EAX register.
 SysNtAllocateVirtualMemory ENDP
+
+;extern wNtAllocateVirtualMemorySSN : DWORD  ; Variable defined in C++
+;SysNtAllocateVirtualMemory PROC
+;    mov r10, rcx
+;    mov eax, wNtAllocateVirtualMemorySSN    ; Load the dynamic SSN
+;    syscall
+;    ret
+;SysNtAllocateVirtualMemory ENDP
+
+SysNtProtectVirtualMemory PROC
+    mov r10, rcx
+    mov eax, 50h 
+    syscall
+    ret
+SysNtProtectVirtualMemory ENDP
 
 SysNtWriteVirtualMemory PROC
     mov r10, rcx

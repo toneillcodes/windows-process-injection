@@ -1,6 +1,9 @@
 EXTERN wNtAllocateVirtualMemorySSN:DWORD
 EXTERN sysAddrNtAllocateVirtualMemory:QWORD
 
+EXTERN wNtProtectVirtualMemorySSN:DWORD
+EXTERN sysAddrNtProtectVirtualMemory:QWORD
+
 EXTERN wNtWriteVirtualMemorySSN:DWORD
 EXTERN sysAddrNtWriteVirtualMemory:QWORD
 
@@ -18,6 +21,12 @@ IndirectSysNtAllocateVirtualMemory PROC
     mov eax, wNtAllocateVirtualMemorySSN
     jmp QWORD PTR [sysAddrNtAllocateVirtualMemory]
 IndirectSysNtAllocateVirtualMemory ENDP
+
+IndirectSysNtProtectVirtualMemory PROC
+    mov r10, rcx
+    mov eax, wNtProtectVirtualMemorySSN
+    jmp QWORD PTR [sysAddrNtProtectVirtualMemory]
+IndirectSysNtProtectVirtualMemory ENDP
 
 ; Similar procedures for NtWriteVirtualMemory syscalls
 IndirectSysNtWriteVirtualMemory PROC
