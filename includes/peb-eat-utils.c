@@ -1,3 +1,4 @@
+#pragma once
 #include "peb-eat-utils.h"
 #include "utils.h"
 #include <stddef.h>
@@ -13,8 +14,11 @@ typedef NTSTATUS(NTAPI* pNtQueryInformationProcess)(
     PULONG ReturnLength
 );
 
+// ============================================================================
 // --- Core Internal Abstraction Layer ---
-// seamlessly handle memory read operations for both local and remote operations
+// ============================================================================
+
+// Seamlessly handles memory read operations for both local and remote execution
 BOOL ReadMemoryInternal(HANDLE hProcess, PVOID baseAddress, PVOID localBuffer, SIZE_T size) {
     if (hProcess == NULL || hProcess == LOCAL_PROCESS_HANDLE) {
         __try {
@@ -30,7 +34,7 @@ BOOL ReadMemoryInternal(HANDLE hProcess, PVOID baseAddress, PVOID localBuffer, S
     }
 }
 
-// PE validation function, if this fails we probably don't have a valid PE and can stop
+// PE validation function to parse and verify DOS and NT headers safely
 BOOL GetPEHeaders(HANDLE hProcess, PVOID moduleBase, IMAGE_DOS_HEADER* outDos, IMAGE_NT_HEADERS* outNt) {
     if (!ReadMemoryInternal(hProcess, moduleBase, outDos, sizeof(IMAGE_DOS_HEADER))) return FALSE;
     if (outDos->e_magic != IMAGE_DOS_SIGNATURE) return FALSE;
@@ -41,6 +45,10 @@ BOOL GetPEHeaders(HANDLE hProcess, PVOID moduleBase, IMAGE_DOS_HEADER* outDos, I
 
     return TRUE;
 }
+
+// ============================================================================
+// --- Generic Manual Parsing Engines ---
+// ============================================================================
 
 PVOID GetModuleBaseManualGeneric(HANDLE hProcess, PVOID pebAddr, const char* targetModuleName) {
     PEB localPeb = { 0 };
@@ -91,7 +99,7 @@ PVOID GetProcAddressManualGeneric(HANDLE hProcess, PVOID moduleBase, const char*
     if (!ReadMemoryInternal(hProcess, exportDirAddr, &exportDir, sizeof(IMAGE_EXPORT_DIRECTORY))) return NULL;
 
     if (functionName == NULL) {
-        // By Ordinal
+        // Resolve via Ordinal
         DWORD functionIndex = ordinal - exportDir.Base;
         if (functionIndex >= exportDir.NumberOfFunctions) return NULL;
 
@@ -102,7 +110,7 @@ PVOID GetProcAddressManualGeneric(HANDLE hProcess, PVOID moduleBase, const char*
         return (BYTE*)moduleBase + funcRVA;
     }
 
-    // By Name (Binary Search)
+    // Resolve via Name (Binary Search)
     DWORD* nameTable = (DWORD*)malloc(exportDir.NumberOfNames * sizeof(DWORD));
     WORD* ordinalTable = (WORD*)malloc(exportDir.NumberOfNames * sizeof(WORD));
     if (!nameTable || !ordinalTable) {
@@ -148,8 +156,10 @@ PVOID GetProcAddressManualGeneric(HANDLE hProcess, PVOID moduleBase, const char*
     return functionAddress;
 }
 
-PVOID GetPebAddress(HANDLE hProcess) {
-    if (hProcess == NULL || hProcess == LOCAL_PROCESS_HANDLE) {
+PVOID GetPebAddressGeneric(HANDLE hProcess) {
+    // --- Bootstrap our own API resolution via the local PEB ---
+    // Get the local PEB base address silently
+    if (hProcess == NULL || hProcess == LOCAL_PROCESS_HANDLE || hProcess == GetCurrentProcess()) {
 #ifdef _WIN64
         return (PVOID)__readgsqword(0x60);
 #else
@@ -157,8 +167,7 @@ PVOID GetPebAddress(HANDLE hProcess) {
 #endif
     }
 
-    // --- Bootstrap our own API resolution via the local PEB ---
-    // Get the local PEB base address silently
+    // Remote Architecture Traversal Path
 #ifdef _WIN64
     PVOID localPeb = (PVOID)__readgsqword(0x60);
 #else
@@ -206,8 +215,6 @@ BOOL GetModuleSectionGeneric(HANDLE hProcess, PVOID moduleBase, const char* sect
     BOOL found = FALSE;
     for (WORD i = 0; i < numberOfSections; i++) {
         if (strncmp((char*)sectionHeaders[i].Name, sectionName, IMAGE_SIZEOF_SHORT_NAME) == 0) {
-            //outSectionInfo->VirtualAddress = (BYTE*)moduleBase + sectionHeaders[i].VirtualAddress;
-            // Copy the offset directly (DWORD to DWORD)
             outSectionInfo->VirtualAddress = sectionHeaders[i].VirtualAddress;
             outSectionInfo->SizeOfRawData = sectionHeaders[i].SizeOfRawData;
             outSectionInfo->VirtualSize = sectionHeaders[i].Misc.VirtualSize;
@@ -221,14 +228,78 @@ BOOL GetModuleSectionGeneric(HANDLE hProcess, PVOID moduleBase, const char* sect
 }
 
 /**
- * Accepts an already populated local PEB structure copy.
+ * Finds the absolute virtual address of the first exported function entry point
+ * that physically resides inside the .text section.
  */
+PVOID FindFirstExportInTextSectionGeneric(HANDLE hProcess, PVOID moduleBase) {
+    // 1. Reuse your existing section finder to get .text boundaries cleanly
+    IMAGE_SECTION_INFO textSec = { 0 };
+    if (!GetModuleSectionGeneric(hProcess, moduleBase, ".text", &textSec)) {
+        printf("[-] Failed to find .text section boundaries.\n");
+        return NULL;
+    }
+
+    DWORD textStartRVA = textSec.VirtualAddress;
+    DWORD textEndRVA = textStartRVA + ((textSec.VirtualSize > 0) ? textSec.VirtualSize : textSec.SizeOfRawData);
+
+    // 2. Read and validate PE headers for the Export Data Directory
+    IMAGE_DOS_HEADER dosHeader = { 0 };
+    IMAGE_NT_HEADERS ntHeaders = { 0 };
+    if (!GetPEHeaders(hProcess, moduleBase, &dosHeader, &ntHeaders)) return NULL;
+
+    IMAGE_DATA_DIRECTORY exportDataDir = ntHeaders.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
+    if (exportDataDir.VirtualAddress == 0 || exportDataDir.Size == 0) return NULL;
+
+    // 3. Read the core Export Directory
+    IMAGE_EXPORT_DIRECTORY exportDir = { 0 };
+    PVOID exportDirAddr = (BYTE*)moduleBase + exportDataDir.VirtualAddress;
+    if (!ReadMemoryInternal(hProcess, exportDirAddr, &exportDir, sizeof(IMAGE_EXPORT_DIRECTORY))) return NULL;
+    if (exportDir.NumberOfFunctions == 0) return NULL;
+
+    // 4. Pull down the Export Address Table (EAT)
+    DWORD* eatBuffer = (DWORD*)malloc(exportDir.NumberOfFunctions * sizeof(DWORD));
+    if (!eatBuffer) return NULL;
+
+    PVOID eatAddress = (BYTE*)moduleBase + exportDir.AddressOfFunctions;
+    if (!ReadMemoryInternal(hProcess, eatAddress, eatBuffer, exportDir.NumberOfFunctions * sizeof(DWORD))) {
+        free(eatBuffer);
+        return NULL;
+    }
+
+    PVOID targetFunctionAddress = NULL;
+
+    // 5. Locate the first valid RVA residing inside the .text section
+    for (DWORD i = 0; i < exportDir.NumberOfFunctions; i++) {
+        DWORD currentFuncRVA = eatBuffer[i];
+        if (currentFuncRVA == 0) continue;
+
+        // Skip forwarded exports
+        if (currentFuncRVA >= exportDataDir.VirtualAddress && 
+            currentFuncRVA < (exportDataDir.VirtualAddress + exportDataDir.Size)) {
+            continue;
+        }
+
+        // Check if RVA fits inside .text bounds
+        if (currentFuncRVA >= textStartRVA && currentFuncRVA < textEndRVA) {
+            targetFunctionAddress = (BYTE*)moduleBase + currentFuncRVA;
+            break; 
+        }
+    }
+
+    free(eatBuffer);
+    return targetFunctionAddress;
+}
+
+// ============================================================================
+// --- Image Path Utilities ---
+// ============================================================================
+
 WCHAR* GetRemoteProcessImagePathEx(HANDLE hProcess, PPEB pLocalPebContent) {
     if (!pLocalPebContent || !pLocalPebContent->ProcessParameters) return NULL;
 
     // 1. Read the Process Parameters structure using the pointer inside your pre-read PEB
     RTL_USER_PROCESS_PARAMETERS_LITE procParams;
-    if (!ReadProcessMemory(hProcess, pLocalPebContent->ProcessParameters, &procParams, sizeof(procParams), NULL)) {
+    if (!ReadMemoryInternal(hProcess, pLocalPebContent->ProcessParameters, &procParams, sizeof(procParams))) {
         return NULL;
     }
 
@@ -239,8 +310,8 @@ WCHAR* GetRemoteProcessImagePathEx(HANDLE hProcess, PPEB pLocalPebContent) {
 
     ZeroMemory(localPathBuffer, pathLenBytes + sizeof(WCHAR));
 
-    if (ReadProcessMemory(hProcess, procParams.ImagePathName.Buffer, localPathBuffer, pathLenBytes, NULL)) {
-        return localPathBuffer; // Caller frees
+    if (ReadMemoryInternal(hProcess, procParams.ImagePathName.Buffer, localPathBuffer, pathLenBytes)) {
+        return localPathBuffer; // Caller frees 
     }
 
     free(localPathBuffer);
@@ -251,11 +322,11 @@ WCHAR* GetRemoteProcessImagePathEx(HANDLE hProcess, PPEB pLocalPebContent) {
  * Convenience Wrapper: Handles fetching the PEB for you if you don't have it yet.
  */
 WCHAR* GetRemoteProcessImagePath(HANDLE hProcess) {
-    PVOID remotePebAddr = GetRemotePebAddress(hProcess);
+    PVOID remotePebAddr = GetPebAddressGeneric(hProcess);
     if (!remotePebAddr) return NULL;
 
     PEB localPeb;
-    if (!ReadProcessMemory(hProcess, remotePebAddr, &localPeb, sizeof(PEB), NULL)) {
+    if (!ReadMemoryInternal(hProcess, remotePebAddr, &localPeb, sizeof(PEB))) {
         return NULL;
     }
 
@@ -263,7 +334,9 @@ WCHAR* GetRemoteProcessImagePath(HANDLE hProcess) {
     return GetRemoteProcessImagePathEx(hProcess, &localPeb);
 }
 
+// ============================================================================
 // --- Exported Public API Wrappers ---
+// ============================================================================
 
 void* GetLocalTebAddress(void) {
 #ifdef _WIN64
@@ -274,7 +347,11 @@ void* GetLocalTebAddress(void) {
 }
 
 PVOID GetRemotePebAddress(HANDLE hProcess) { 
-    return GetPebAddress(hProcess); 
+    return GetPebAddressGeneric(hProcess); 
+}
+
+PVOID GetLocalPebAddress(void) {
+    return GetPebAddressGeneric(LOCAL_PROCESS_HANDLE);
 }
 
 PVOID GetModuleBaseManual(PPEB pebObject, const char* targetModuleName) {

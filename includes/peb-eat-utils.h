@@ -66,17 +66,28 @@ typedef struct _RTL_USER_PROCESS_PARAMETERS_LITE {
 } RTL_USER_PROCESS_PARAMETERS_LITE, *PRTL_USER_PROCESS_PARAMETERS_LITE;
 
 // --- Forward Declarations of Public API Functions ---
-void* GetLocalTebAddress(void);
-PVOID GetRemotePebAddress(HANDLE hProcess);
 
+// PEB/TEB Address Resolution
+void* GetLocalTebAddress(void);
+PVOID GetLocalPebAddress(void);
+PVOID GetRemotePebAddress(HANDLE hProcess);
+PVOID GetPebAddressGeneric(HANDLE hProcess); // Fixes C4047 type mismatch warnings
+
+// Module Base Resolution
 PVOID GetModuleBaseManual(PPEB pebObject, const char* targetModuleName);
 PVOID GetModuleBaseManualRemote(HANDLE hProcess, PVOID remotePebAddr, const char* targetModuleName);
 
+// Image Path Parsing
 WCHAR* GetRemoteProcessImagePathEx(HANDLE hProcess, PPEB pLocalPebContent);
 WCHAR* GetRemoteProcessImagePath(HANDLE hProcess);
 
+// GetProcAddress (EAT) Parsers
 PVOID GPAManualByName(HMODULE hMod, char* targetFunc);
 PVOID GPAManualByOrdinal(HMODULE hMod, WORD ordinal);
 PVOID GetRemoteProcAddressManual(HANDLE hProcess, PVOID moduleBase, const char* functionName);
 
+// Section Headers Utilities
 BOOL GetRemoteModuleSection(HANDLE hProcess, PVOID moduleBase, const char* sectionName, IMAGE_SECTION_INFO* outSectionInfo);
+
+// Export/Text Section Utilities
+PVOID FindFirstExportInTextSectionGeneric(HANDLE hProcess, PVOID moduleBase);

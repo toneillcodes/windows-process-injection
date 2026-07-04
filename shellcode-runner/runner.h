@@ -7,8 +7,24 @@
 
 typedef LONG NTSTATUS;
 
+typedef enum _SYSCALL_FLAVOR {
+    FLAVOR_WIN32,
+    FLAVOR_DFR,
+    FLAVOR_DIRECT,
+    FLAVOR_INDIRECT
+} SYSCALL_FLAVOR;
+
+typedef enum _PITECHNIQUE {
+    DEFAULT,
+    EARLY_BIRD_APC,
+    PROCESS_HOLLOWING
+} PITECHNIQUE;
+
 // Shared pipeline state
 typedef struct _INJECTION_CONTEXT {
+    BOOL   spawnTarget;
+    char*  spawnPath;
+    DWORD  targetPid;
     HANDLE hProcess;
     HANDLE hThread;
     PVOID  pRemoteAddress;
@@ -17,6 +33,7 @@ typedef struct _INJECTION_CONTEXT {
     char*  targetModule;
     char*  targetExport;
     DWORD  targetOffset;
+    PITECHNIQUE technique;
 } INJECTION_CONTEXT, *PINJECTION_CONTEXT;
 
 // Function pointer signatures, currently unused
@@ -31,13 +48,6 @@ typedef struct _INJECTION_ENGINE {
     FnProtect  Protect;
     FnInvoke   Invoke;    
 } INJECTION_ENGINE, *PINJECTION_ENGINE;
-
-typedef enum _SYSCALL_FLAVOR {
-    FLAVOR_WIN32,
-    FLAVOR_DFR,
-    FLAVOR_DIRECT,
-    FLAVOR_INDIRECT
-} SYSCALL_FLAVOR;
 
 // DFR Definitions
 // https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualallocex
@@ -98,7 +108,6 @@ NTSTATUS IndirectSysNtAllocateVirtualMemory(
     ULONG AllocationType, 
     ULONG Protect
 );
-
 NTSTATUS IndirectSysNtProtectVirtualMemory(
     HANDLE ProcessHandle, 
     PVOID* BaseAddress, 
@@ -113,6 +122,7 @@ NTSTATUS IndirectSysNtWriteVirtualMemory(
     SIZE_T NumberOfBytesToWrite, 
     PSIZE_T NumberOfBytesWritten
 );
+
 NTSTATUS IndirectSysNtCreateThreadEx(
     PHANDLE ThreadHandle, 
     ACCESS_MASK DesiredAccess, 
@@ -126,6 +136,7 @@ NTSTATUS IndirectSysNtCreateThreadEx(
     SIZE_T SizeOfStackReserve, 
     PVOID lpBytesBuffer
 );
+
 NTSTATUS IndirectSysNtWaitForSingleObject(
     HANDLE Handle, 
     BOOLEAN Alertable, 
@@ -198,7 +209,7 @@ NTSTATUS SysNtWaitForSingleObject(
 #endif
 
 // engine declarations
-void InitializeResolver(void);
+BOOL InitializeResolvers(SYSCALL_FLAVOR flavor);
 BOOL DefaultAllocate(PINJECTION_CONTEXT ctx, DWORD protect, SYSCALL_FLAVOR flavor);
 BOOL DefaultWrite(PINJECTION_CONTEXT ctx, LPCVOID pPayload, SYSCALL_FLAVOR flavor);
 BOOL DefaultProtect(PINJECTION_CONTEXT ctx, DWORD targetProtect, PDWORD pOldProtect, SYSCALL_FLAVOR flavor);

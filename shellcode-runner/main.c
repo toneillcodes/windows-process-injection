@@ -6,7 +6,13 @@ void print_usage(const char *app_name) {
     printf("Options:\n");
     printf("  -h, --help                Show this help message\n");
     printf("  -p, --pid                 Target PID for injection\n");
+    printf("  -s, --spawn <value>       Executable to spawn and target for PI\n");    
     printf("  -a, --api <value>         Configure the API method to use (0,1,2,3)\n");
+    printf("      0 = Win32 APIS\n");
+    printf("      1 = DFR APIs\n");
+    printf("      2 = Direct Syscalls\n");
+    printf("      3 = Indirect Syscalls\n");
+    printf("  -t, --technique <value>   Configure the PI technique to use (0,1)\n");    
     printf("  -m, --module <name>       Module stomping target library\n");
     printf("  -e, --export <name>       Module stomping target function\n");
     printf("  -o, --offset <value>      Module stomping target offset\n");
@@ -15,6 +21,7 @@ void print_usage(const char *app_name) {
 int main(int argc, char* argv[]) {
     // default to DFR
     SYSCALL_FLAVOR apiInvocationMethod = FLAVOR_DFR;
+    int piExecutionMethod = 0;
     
     // initialize the context
     INJECTION_CONTEXT ctx = { 0 };
@@ -24,7 +31,8 @@ int main(int argc, char* argv[]) {
     ctx.payloadSize = sizeof(mockShellcode);
     ctx.targetModule = NULL;
     ctx.targetExport = NULL;
-    ctx.targetOffset = 0;    
+    ctx.targetOffset = 0;
+    ctx.technique = DEFAULT;
 
     INJECTION_ENGINE engine;
     engine.Allocate = DefaultAllocate;
@@ -37,9 +45,12 @@ int main(int argc, char* argv[]) {
     char *spawnPath = NULL;
     int targetPid = 0;
     int apiMethod = 0;
+    int technique = 0;
     char *targetModule = NULL;
     char *targetExport = NULL;
     DWORD targetOffset = 0;   
+
+    int piTechnique = 0;
 
     printf("--- Processing Arguments ---\n");
     for (int i = 1; i < argc; i++) {
@@ -56,8 +67,13 @@ int main(int argc, char* argv[]) {
             } \
         } while(0)
 
+        // ---- Help ----
+        if (strcmp(arg, "-h") == 0 || strcmp(arg, "--help") == 0) {
+            print_usage(argv[0]);
+        } 
+
         // ---- Target PID ----
-        if (strcmp(arg, "-p") == 0 || strcmp(arg, "--pid") == 0) {
+        else if (strcmp(arg, "-p") == 0 || strcmp(arg, "--pid") == 0) {
             FETCH_OPTARG();
             ctx.targetPid = (int)strtol(optarg, NULL, 0);
             printf("[*] Using PI parameter targetPid = %d\n", targetPid);            
@@ -96,8 +112,22 @@ int main(int argc, char* argv[]) {
                 printf("[ERROR] Unrecognized API method selected.\n");
                 return -1;
             }
-        } 
+        }
         
+        // ---- Execution Technique ----
+        else if (strcmp(arg, "-t") == 0 || strcmp(arg, "--technique") == 0) {
+            FETCH_OPTARG();
+            piTechnique = (int)strtol(optarg, NULL, 0);
+            if (piTechnique == 0) {
+                printf("[*] Using Early Bird APC technique.\n");
+                ctx.technique = EARLY_BIRD_APC;
+            }
+            else {
+                printf("[ERROR] Unrecognized technique selected.\n");
+                return -1;
+            }
+        }
+
         // ---- Target Module ----
         else if (strcmp(arg, "-m") == 0 || strcmp(arg, "--module") == 0) {
             FETCH_OPTARG();
@@ -121,8 +151,7 @@ int main(int argc, char* argv[]) {
         // ---- Target Offset ----
         else if (strcmp(arg, "-o") == 0 || strcmp(arg, "--offset") == 0) {
             FETCH_OPTARG();            
-            // Parse the string as a hexadecimal value (handles both "0x1A" and "1A" format variants)
-            //targetOffset = strtoul(argv[++i], NULL, 16);            
+            // Parse the string as a hexadecimal value (handles both "0x1A" and "1A" format variants)             
             targetOffset = strtoul(optarg, NULL, 16);
             printf("[*] Configuring module stomping with targetOffset = %ld\n", targetOffset);
             ctx.enableStomping = TRUE;
@@ -157,7 +186,7 @@ int main(int argc, char* argv[]) {
             WaitForSingleObject(ctx.hThread, INFINITE); 
             
             // Option B: Or a quick sleep if testing asynchronous behavior
-            // Sleep(2000); 
+            //Sleep(2000); 
             
             CloseHandle(ctx.hThread);
             if(spawnProcess) {
