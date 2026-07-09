@@ -1,3 +1,4 @@
+; syscalls found on Windows Server 2025 using syscallhunter\syscallhunter.c
 ;
 ; Function: NtAllocateVirtualMemory
 ; SSN:      0x0018
@@ -13,6 +14,12 @@
 ;
 ; Function: NtWaitForSingleObject
 ; SSN:      0x0004
+;
+; Function: NtQueueApcThread
+; SSN:      0x0045
+;
+; Function: NtResumeThread
+; SSN:      0x0052
 ;
 
 .CODE
@@ -37,14 +44,6 @@ SysNtAllocateVirtualMemory PROC
     ret                 ; Return to the caller. The NTSTATUS result 
                         ; will be stored in the EAX register.
 SysNtAllocateVirtualMemory ENDP
-
-;extern wNtAllocateVirtualMemorySSN : DWORD  ; Variable defined in C++
-;SysNtAllocateVirtualMemory PROC
-;    mov r10, rcx
-;    mov eax, wNtAllocateVirtualMemorySSN    ; Load the dynamic SSN
-;    syscall
-;    ret
-;SysNtAllocateVirtualMemory ENDP
 
 SysNtProtectVirtualMemory PROC
     mov r10, rcx
@@ -73,5 +72,19 @@ SysNtWaitForSingleObject PROC
     syscall
     ret
 SysNtWaitForSingleObject ENDP
+
+SysNtQueueApcThread PROC
+    mov r10, rcx
+    mov eax, 45h
+    syscall
+    ret
+SysNtQueueApcThread ENDP
+
+SysNtResumeThread PROC
+    mov r10, rcx
+    mov eax, 52h
+    syscall
+    ret
+SysNtResumeThread ENDP
 
 END

