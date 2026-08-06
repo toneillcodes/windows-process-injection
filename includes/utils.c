@@ -76,3 +76,76 @@ int my_wcsicmp(const wchar_t* s1, const wchar_t* s2) {
     
     return c1 - c2;
 }
+
+void* my_memcpy(void* dst, const void* src, SIZE_T len) {
+    BYTE* d = (BYTE*)dst;
+    const BYTE* s = (const BYTE*)src;
+    while (len--) {
+        *d++ = *s++;
+    }
+    return dst;
+}
+
+char* my_strcpy(char* dst, const char* src) {
+    char* ret = dst;
+    while ((*dst++ = *src++) != '\0');
+    return ret;
+}
+
+char* my_strcpy_safe(char* dst, const char* src) {
+    if (!dst || !src) return NULL;
+
+    char* ret = dst;
+    while ((*dst++ = *src++) != '\0');
+    return ret;
+}
+
+char* my_strcpy_len(char* dst, const char* src, SIZE_T maxLen) {
+    if (!dst || !src || maxLen == 0) return NULL;
+
+    SIZE_T i = 0;
+    while (i + 1 < maxLen && src[i] != '\0') {
+        dst[i] = src[i];
+        i++;
+    }
+    dst[i] = '\0';
+    return dst;
+}
+
+char* my_strchr(const char* s, int ch) {
+    while (*s) {
+        if (*s == (char)ch)
+            return (char*)s;
+        s++;
+    }
+    return (ch == '\0') ? (char*)s : NULL;
+}
+
+char* my_strchr_safe(const char* s, int ch) {
+    if (!s) return NULL;
+    while (*s) {
+        if (*s == (char)ch)
+            return (char*)s;
+        s++;
+    }
+    return (ch == '\0') ? (char*)s : NULL;
+}
+
+char* my_strcat(char* dst, const char* src) {
+    char* ret = dst;
+
+    while (*dst) dst++;        // find end of dst
+    while ((*dst++ = *src++) != '\0');  // append src including null
+
+    return ret;
+}
+
+char* my_strcat_safe(char* dst, const char* src) {
+    if (!dst || !src) return NULL;
+
+    char* ret = dst;
+    while (*dst) dst++;
+    while ((*dst++ = *src++) != '\0');
+
+    return ret;
+}
