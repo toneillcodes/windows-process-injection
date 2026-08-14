@@ -27,6 +27,17 @@ DWORD GetSSN(PVOID functionAddress) {
     return 0;
 }
 
+DWORD GetSSNByHash(PPEB peb, HASHED_VALUE hvModule, HASHED_VALUE hvFunction)
+{
+    HMODULE hModule = GetModuleBaseManualHashed(peb, hvModule);
+    if (!hModule) return 0;
+
+    PVOID fn = GPAManualByHash(hModule, hvFunction);
+    if (!fn) return 0;
+
+    return GetSSN(fn);
+}
+
 // Simplified logic to find the 'syscall' opcode (0x0F 0x05)
 PVOID GetSyscallAddress(PVOID functionAddress) {
 	BYTE* ptr = (BYTE*)functionAddress;

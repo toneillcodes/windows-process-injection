@@ -112,6 +112,19 @@ char* my_strcpy_len(char* dst, const char* src, SIZE_T maxLen) {
     return dst;
 }
 
+char* my_strncpy(char* dst, const char* src, size_t n) {
+    char* ret = dst;
+
+    while (n-- && (*dst++ = *src++) != '\0')
+        ;
+
+    // If we broke out because src ended, pad the rest with '\0'
+    while (n-- > 0)
+        *dst++ = '\0';
+
+    return ret;
+}
+
 char* my_strchr(const char* s, int ch) {
     while (*s) {
         if (*s == (char)ch)
