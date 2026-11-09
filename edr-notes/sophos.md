@@ -2,9 +2,12 @@
 NOTE: Everything here is likely out of date by the time it is here.
 This information may still be interesting or helpful for people who are interested in AV/EDR evasion.
 
-DLL SophosED.dll
+**DLL**: SophosED.dll
 
-DLL Injection?              
-DLL Injection on Debug?     
-Usermode Hooking?           
-Kernel Hooking?             
+## Telemetry
+| Method | In Use? |
+|---|---|
+| DLL Injection? | TBD |
+| DLL Injection on Debug? | TBD |
+| Usermode Hooking? | TBD |
+| Kernel Hooking? | TBD |           

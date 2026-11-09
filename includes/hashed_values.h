@@ -1,3 +1,4 @@
+// expanded to a standalone project at: https://github.com/toneillcodes/HashIt
 // hashed_values.h
 #pragma once
 #include "hashit.h"

@@ -1,3 +1,4 @@
+// expanded to a standalone project at: https://github.com/toneillcodes/HashIt
 #pragma once
 #include <windows.h>
 #include <stdio.h>
